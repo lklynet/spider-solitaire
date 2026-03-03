@@ -30,6 +30,7 @@ export interface GameState {
   isPlaying: boolean;
   isPaused: boolean;
   gameWon: boolean;
+  showWinModal: boolean;
   seed: string;
   history: GameHistory[];
   hintSource?: { pileIndex: number, cardIndex: number };

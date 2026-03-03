@@ -54,6 +54,7 @@ export const Game: React.FC = () => {
     }
   }, [markDailyChallengeCompleted, recordWin, store.gameWon, store.moves, store.score, store.seed, store.timer]);
 
+
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
     if (isPlaying && !gameWon) {
@@ -161,14 +162,17 @@ export const Game: React.FC = () => {
   return (
     <div className="min-h-screen bg-background p-4 flex flex-col gap-6">
       <StatsModal 
-        isOpen={showStats} 
-        onClose={() => setShowStats(false)} 
+        isOpen={showStats || store.showWinModal} 
+        onClose={() => {
+          setShowStats(false);
+          store.setShowWinModal(false);
+        }} 
         gameWon={store.gameWon}
         score={store.score}
         moves={store.moves}
         time={store.timer}
         onPlayAgain={handleNewGame}
-        defaultTab={statsTab}
+        defaultTab={store.showWinModal ? 'stats' : statsTab}
       />
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
       

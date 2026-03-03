@@ -20,6 +20,7 @@ interface GameStore extends GameState {
   setCardBack: (id: number) => void;
   colorScheme: string;
   setColorScheme: (scheme: string) => void;
+  setShowWinModal: (show: boolean) => void;
 }
 
 // Helper to check if a group of cards is valid to move (descending same suit)
@@ -54,12 +55,14 @@ export const useGameStore = create<GameStore>()(
   isPlaying: false,
   isPaused: false,
   gameWon: false,
+  showWinModal: false,
   seed: '',
   history: [],
   cardBack: 1,
   setCardBack: (id) => set({ cardBack: id }),
   colorScheme: 'default',
   setColorScheme: (scheme) => set({ colorScheme: scheme }),
+  setShowWinModal: (show) => set({ showWinModal: show }),
 
   initializeGame: (seed) => {
     const finalSeed = seed || Math.random().toString(36).substring(7);
@@ -97,6 +100,7 @@ export const useGameStore = create<GameStore>()(
       isPlaying: false, 
     isPaused: false,
       gameWon: false,
+      showWinModal: false,
       seed: finalSeed,
       history: [] // Clear history
     });
@@ -192,6 +196,7 @@ export const useGameStore = create<GameStore>()(
         score: newScore,
         foundation: newFoundation,
         gameWon,
+        showWinModal: gameWon,
         isPlaying: true,
         isPaused: false // Auto-resume on move
     });
@@ -254,6 +259,7 @@ export const useGameStore = create<GameStore>()(
           foundation: newFoundation,
           score: newScore,
           gameWon,
+          showWinModal: gameWon,
           isPlaying: !gameWon,
           isPaused: false // Auto-resume on deal
       });
@@ -273,6 +279,7 @@ export const useGameStore = create<GameStore>()(
           moves: moves + 1,
           isPaused: false, // Auto-resume on undo
           gameWon: false,
+          showWinModal: false,
           isPlaying: true
       });
       useStatsStore.getState().recordUndo();
