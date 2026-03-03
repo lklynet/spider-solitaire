@@ -17,12 +17,15 @@ export const Game: React.FC = () => {
   const recordLoss = useStatsStore(state => state.recordLoss);
   const markDailyChallengeCompleted = useStatsStore(state => state.markDailyChallengeCompleted);
   const dailyChallengesCompleted = useStatsStore(state => state.dailyChallengesCompleted);
+  const achievementToasts = useStatsStore(state => state.achievementToasts);
+  const dismissAchievementToast = useStatsStore(state => state.dismissAchievementToast);
   const [selectedPileIndex, setSelectedPileIndex] = useState<number | null>(null);
   const [selectedCardIndex, setSelectedCardIndex] = useState<number | null>(null);
   const [showStats, setShowStats] = useState(false);
   const [statsTab, setStatsTab] = useState<'stats' | 'achievements'>('stats');
   const [showSettings, setShowSettings] = useState(false);
   const recordedSeedRef = React.useRef<string | null>(null);
+  const toastTimersRef = React.useRef<Map<string, number>>(new Map());
   const isPlaying = store.isPlaying;
   const gameWon = store.gameWon;
   const incrementTimer = store.incrementTimer;
@@ -64,6 +67,24 @@ export const Game: React.FC = () => {
     }
     return () => clearInterval(interval);
   }, [gameWon, incrementTimer, isPlaying]);
+
+  useEffect(() => {
+    const timers = toastTimersRef.current;
+    for (const toast of achievementToasts) {
+      if (timers.has(toast.id)) continue;
+      const timeoutId = window.setTimeout(() => {
+        dismissAchievementToast(toast.id);
+        timers.delete(toast.id);
+      }, 4000);
+      timers.set(toast.id, timeoutId);
+    }
+    return () => {
+      for (const timeoutId of timers.values()) {
+        window.clearTimeout(timeoutId);
+      }
+      timers.clear();
+    };
+  }, [achievementToasts, dismissAchievementToast]);
 
   const handleCardClick = (pileIndex: number, cardIndex: number) => {
     const pile = store.tableau[pileIndex];
@@ -159,8 +180,28 @@ export const Game: React.FC = () => {
   }, [dailyChallengesCompleted, today]);
   const isDailyActive = store.seed === today && !store.gameWon;
 
+  const tierStyles = {
+    bronze: "border-[#cd7f32] bg-[#cd7f32]/15 text-[#f6d1a8]",
+    silver: "border-slate-300 bg-slate-200/15 text-slate-100",
+    gold: "border-yellow-300 bg-yellow-300/15 text-yellow-100",
+    platinum: "border-cyan-200 bg-cyan-200/15 text-cyan-50",
+    diamond: "border-purple-300 bg-purple-300/15 text-purple-100"
+  };
+
   return (
     <div className="min-h-screen bg-background p-4 flex flex-col gap-6">
+      <div className="fixed right-4 top-4 z-[60] flex flex-col gap-3">
+        {achievementToasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`w-72 border-2 rounded-xl px-4 py-3 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.4)] backdrop-blur-sm ${tierStyles[toast.tier]}`}
+          >
+            <div className="text-xs uppercase tracking-wider font-black opacity-80">Achievement Unlocked</div>
+            <div className="text-base font-black">{toast.title}</div>
+            <div className="text-[11px] uppercase font-bold opacity-80">{toast.tier} tier · +{toast.points} XP</div>
+          </div>
+        ))}
+      </div>
       <StatsModal 
         isOpen={showStats || store.showWinModal} 
         onClose={() => {

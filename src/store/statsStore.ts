@@ -401,6 +401,15 @@ export interface WeeklyStats {
   bestMoves: number | null;
 }
 
+export interface AchievementToast {
+  id: string;
+  chainId: string;
+  title: string;
+  tier: AchievementTier;
+  points: number;
+  type: AchievementType;
+}
+
 interface StatsStore extends GameStats {
   daily: DailyStats;
   weekly: WeeklyStats;
@@ -412,6 +421,7 @@ interface StatsStore extends GameStats {
   allTimeAchievementProgress: Record<string, number>;
   dailyAchievementProgress: Record<string, number>;
   weeklyAchievementProgress: Record<string, number>;
+  achievementToasts: AchievementToast[];
   recordGameStart: () => void;
   recordWin: (score: number, time: number, moves: number) => void;
   recordLoss: () => void;
@@ -422,6 +432,7 @@ interface StatsStore extends GameStats {
   markDailyChallengeCompleted: (date: string) => void;
   refreshPeriods: () => void;
   resetStats: () => void;
+  dismissAchievementToast: (id: string) => void;
 }
 
 const createDaily = (date: string): DailyStats => ({
@@ -544,11 +555,12 @@ export const getAchievementChainProgressRatio = (state: StatsStore, chain: Achie
   return Math.min(1, status.value / target);
 };
 
-const applyAchievementUpdates = (state: StatsStore) => {
+const applyAchievementUpdates = (state: StatsStore, emitToasts = true) => {
   const allTimeProgress = { ...state.allTimeAchievementProgress };
   const dailyProgress = { ...state.dailyAchievementProgress };
   const weeklyProgress = { ...state.weeklyAchievementProgress };
   let rankPoints = state.rankPoints;
+  const unlockedAchievements: AchievementToast[] = [];
 
   for (const chain of achievementChains) {
     const value = getMetricValue(state, chain.metric);
@@ -556,6 +568,18 @@ const applyAchievementUpdates = (state: StatsStore) => {
     if (chain.type === 'all-time') {
       const previousCount = allTimeProgress[chain.id] ?? 0;
       if (completedCount > previousCount) {
+        if (emitToasts) {
+          for (const tier of chain.tiers.slice(previousCount, completedCount)) {
+            unlockedAchievements.push({
+              id: `${chain.id}-${tier.tier}-${tier.target}-${Date.now()}-${Math.random()}`,
+              chainId: chain.id,
+              title: chain.title,
+              tier: tier.tier,
+              points: tier.points,
+              type: chain.type
+            });
+          }
+        }
         const earned = chain.tiers.slice(previousCount, completedCount).reduce((sum, tier) => sum + tier.points, 0);
         rankPoints += earned;
         allTimeProgress[chain.id] = completedCount;
@@ -565,6 +589,18 @@ const applyAchievementUpdates = (state: StatsStore) => {
     if (chain.type === 'daily') {
       const previousCount = dailyProgress[chain.id] ?? 0;
       if (completedCount > previousCount) {
+        if (emitToasts) {
+          for (const tier of chain.tiers.slice(previousCount, completedCount)) {
+            unlockedAchievements.push({
+              id: `${chain.id}-${tier.tier}-${tier.target}-${Date.now()}-${Math.random()}`,
+              chainId: chain.id,
+              title: chain.title,
+              tier: tier.tier,
+              points: tier.points,
+              type: chain.type
+            });
+          }
+        }
         const earned = chain.tiers.slice(previousCount, completedCount).reduce((sum, tier) => sum + tier.points, 0);
         rankPoints += earned;
         dailyProgress[chain.id] = completedCount;
@@ -574,6 +610,18 @@ const applyAchievementUpdates = (state: StatsStore) => {
     if (chain.type === 'weekly') {
       const previousCount = weeklyProgress[chain.id] ?? 0;
       if (completedCount > previousCount) {
+        if (emitToasts) {
+          for (const tier of chain.tiers.slice(previousCount, completedCount)) {
+            unlockedAchievements.push({
+              id: `${chain.id}-${tier.tier}-${tier.target}-${Date.now()}-${Math.random()}`,
+              chainId: chain.id,
+              title: chain.title,
+              tier: tier.tier,
+              points: tier.points,
+              type: chain.type
+            });
+          }
+        }
         const earned = chain.tiers.slice(previousCount, completedCount).reduce((sum, tier) => sum + tier.points, 0);
         rankPoints += earned;
         weeklyProgress[chain.id] = completedCount;
@@ -585,7 +633,8 @@ const applyAchievementUpdates = (state: StatsStore) => {
     rankPoints,
     allTimeAchievementProgress: allTimeProgress,
     dailyAchievementProgress: dailyProgress,
-    weeklyAchievementProgress: weeklyProgress
+    weeklyAchievementProgress: weeklyProgress,
+    unlockedAchievements
   };
 };
 
@@ -623,6 +672,7 @@ export const useStatsStore = create<StatsStore>()(
       allTimeAchievementProgress: {},
       dailyAchievementProgress: {},
       weeklyAchievementProgress: {},
+      achievementToasts: [],
 
       recordGameStart: () => {
         set(state => {
@@ -637,11 +687,19 @@ export const useStatsStore = create<StatsStore>()(
             dailyAchievementProgress,
             weeklyAchievementProgress
           };
+          const achievementUpdates = applyAchievementUpdates(nextState);
           return {
             gamesPlayed: nextState.gamesPlayed,
             daily: nextDaily,
             weekly: nextWeekly,
-            ...applyAchievementUpdates(nextState)
+            rankPoints: achievementUpdates.rankPoints,
+            allTimeAchievementProgress: achievementUpdates.allTimeAchievementProgress,
+            dailyAchievementProgress: achievementUpdates.dailyAchievementProgress,
+            weeklyAchievementProgress: achievementUpdates.weeklyAchievementProgress,
+            achievementToasts: [
+              ...state.achievementToasts,
+              ...achievementUpdates.unlockedAchievements
+            ]
           };
         });
       },
@@ -675,6 +733,7 @@ export const useStatsStore = create<StatsStore>()(
             dailyAchievementProgress,
             weeklyAchievementProgress
           };
+          const achievementUpdates = applyAchievementUpdates(nextState);
           return {
             gamesWon: nextState.gamesWon,
             currentStreak: nextState.currentStreak,
@@ -684,7 +743,14 @@ export const useStatsStore = create<StatsStore>()(
             leastMoves: nextState.leastMoves,
             daily: nextDaily,
             weekly: nextWeekly,
-            ...applyAchievementUpdates(nextState)
+            rankPoints: achievementUpdates.rankPoints,
+            allTimeAchievementProgress: achievementUpdates.allTimeAchievementProgress,
+            dailyAchievementProgress: achievementUpdates.dailyAchievementProgress,
+            weeklyAchievementProgress: achievementUpdates.weeklyAchievementProgress,
+            achievementToasts: [
+              ...state.achievementToasts,
+              ...achievementUpdates.unlockedAchievements
+            ]
           };
         });
       },
@@ -709,11 +775,19 @@ export const useStatsStore = create<StatsStore>()(
             dailyAchievementProgress,
             weeklyAchievementProgress
           };
+          const achievementUpdates = applyAchievementUpdates(nextState);
           return {
             totalMoves: nextState.totalMoves,
             daily: nextDaily,
             weekly: nextWeekly,
-            ...applyAchievementUpdates(nextState)
+            rankPoints: achievementUpdates.rankPoints,
+            allTimeAchievementProgress: achievementUpdates.allTimeAchievementProgress,
+            dailyAchievementProgress: achievementUpdates.dailyAchievementProgress,
+            weeklyAchievementProgress: achievementUpdates.weeklyAchievementProgress,
+            achievementToasts: [
+              ...state.achievementToasts,
+              ...achievementUpdates.unlockedAchievements
+            ]
           };
         });
       },
@@ -731,11 +805,19 @@ export const useStatsStore = create<StatsStore>()(
             dailyAchievementProgress,
             weeklyAchievementProgress
           };
+          const achievementUpdates = applyAchievementUpdates(nextState);
           return {
             totalDeals: nextState.totalDeals,
             daily: nextDaily,
             weekly: nextWeekly,
-            ...applyAchievementUpdates(nextState)
+            rankPoints: achievementUpdates.rankPoints,
+            allTimeAchievementProgress: achievementUpdates.allTimeAchievementProgress,
+            dailyAchievementProgress: achievementUpdates.dailyAchievementProgress,
+            weeklyAchievementProgress: achievementUpdates.weeklyAchievementProgress,
+            achievementToasts: [
+              ...state.achievementToasts,
+              ...achievementUpdates.unlockedAchievements
+            ]
           };
         });
       },
@@ -745,12 +827,27 @@ export const useStatsStore = create<StatsStore>()(
           const { daily, weekly, dailyAchievementProgress, weeklyAchievementProgress } = normalizePeriods(state);
           const nextDaily = { ...daily, hints: daily.hints + 1 };
           const nextWeekly = { ...weekly, hints: weekly.hints + 1 };
-          return {
+          const nextState = {
+            ...state,
             totalHints: state.totalHints + 1,
             daily: nextDaily,
             weekly: nextWeekly,
             dailyAchievementProgress,
             weeklyAchievementProgress
+          };
+          const achievementUpdates = applyAchievementUpdates(nextState);
+          return {
+            totalHints: state.totalHints + 1,
+            daily: nextDaily,
+            weekly: nextWeekly,
+            dailyAchievementProgress: achievementUpdates.dailyAchievementProgress,
+            weeklyAchievementProgress: achievementUpdates.weeklyAchievementProgress,
+            allTimeAchievementProgress: achievementUpdates.allTimeAchievementProgress,
+            rankPoints: achievementUpdates.rankPoints,
+            achievementToasts: [
+              ...state.achievementToasts,
+              ...achievementUpdates.unlockedAchievements
+            ]
           };
         });
       },
@@ -760,12 +857,27 @@ export const useStatsStore = create<StatsStore>()(
           const { daily, weekly, dailyAchievementProgress, weeklyAchievementProgress } = normalizePeriods(state);
           const nextDaily = { ...daily, undos: daily.undos + 1 };
           const nextWeekly = { ...weekly, undos: weekly.undos + 1 };
-          return {
+          const nextState = {
+            ...state,
             totalUndos: state.totalUndos + 1,
             daily: nextDaily,
             weekly: nextWeekly,
             dailyAchievementProgress,
             weeklyAchievementProgress
+          };
+          const achievementUpdates = applyAchievementUpdates(nextState);
+          return {
+            totalUndos: state.totalUndos + 1,
+            daily: nextDaily,
+            weekly: nextWeekly,
+            dailyAchievementProgress: achievementUpdates.dailyAchievementProgress,
+            weeklyAchievementProgress: achievementUpdates.weeklyAchievementProgress,
+            allTimeAchievementProgress: achievementUpdates.allTimeAchievementProgress,
+            rankPoints: achievementUpdates.rankPoints,
+            achievementToasts: [
+              ...state.achievementToasts,
+              ...achievementUpdates.unlockedAchievements
+            ]
           };
         });
       },
@@ -782,11 +894,19 @@ export const useStatsStore = create<StatsStore>()(
             dailyAchievementProgress,
             weeklyAchievementProgress
           };
+          const achievementUpdates = applyAchievementUpdates(nextState);
           return {
             dailyChallengesCompleted: nextState.dailyChallengesCompleted,
             daily,
             weekly,
-            ...applyAchievementUpdates(nextState)
+            rankPoints: achievementUpdates.rankPoints,
+            allTimeAchievementProgress: achievementUpdates.allTimeAchievementProgress,
+            dailyAchievementProgress: achievementUpdates.dailyAchievementProgress,
+            weeklyAchievementProgress: achievementUpdates.weeklyAchievementProgress,
+            achievementToasts: [
+              ...state.achievementToasts,
+              ...achievementUpdates.unlockedAchievements
+            ]
           };
         });
       },
@@ -801,7 +921,15 @@ export const useStatsStore = create<StatsStore>()(
             dailyAchievementProgress,
             weeklyAchievementProgress
           };
-          return { daily, weekly, ...applyAchievementUpdates(nextState) };
+          const achievementUpdates = applyAchievementUpdates(nextState, false);
+          return {
+            daily,
+            weekly,
+            rankPoints: achievementUpdates.rankPoints,
+            allTimeAchievementProgress: achievementUpdates.allTimeAchievementProgress,
+            dailyAchievementProgress: achievementUpdates.dailyAchievementProgress,
+            weeklyAchievementProgress: achievementUpdates.weeklyAchievementProgress
+          };
         });
       },
 
@@ -824,8 +952,15 @@ export const useStatsStore = create<StatsStore>()(
           rankPoints: 0,
           allTimeAchievementProgress: {},
           dailyAchievementProgress: {},
-          weeklyAchievementProgress: {}
+          weeklyAchievementProgress: {},
+          achievementToasts: []
         });
+      },
+
+      dismissAchievementToast: (id: string) => {
+        set(state => ({
+          achievementToasts: state.achievementToasts.filter(toast => toast.id !== id)
+        }));
       }
     }),
     {
