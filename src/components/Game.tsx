@@ -7,7 +7,7 @@ import { Foundation } from './Foundation';
 import { Controls } from './Controls';
 import { StatsModal } from './StatsModal';
 import { SettingsModal } from './SettingsModal';
-import { BarChart2, Calendar, Check, AlertTriangle, Palette } from 'lucide-react';
+import { BarChart2, Calendar, Check, AlertTriangle, Palette, Trophy } from 'lucide-react';
 import { format } from 'date-fns';
 
 export const Game: React.FC = () => {
@@ -16,12 +16,18 @@ export const Game: React.FC = () => {
   const [selectedPileIndex, setSelectedPileIndex] = useState<number | null>(null);
   const [selectedCardIndex, setSelectedCardIndex] = useState<number | null>(null);
   const [showStats, setShowStats] = useState(false);
+  const [statsTab, setStatsTab] = useState<'stats' | 'achievements'>('stats');
   const [showSettings, setShowSettings] = useState(false);
   const recordedSeedRef = React.useRef<string | null>(null);
+  const isPlaying = store.isPlaying;
+  const gameWon = store.gameWon;
+  const incrementTimer = store.incrementTimer;
 
   useEffect(() => {
-    store.initializeGame();
-  }, []);
+    if (!store.seed) {
+      store.initializeGame();
+    }
+  }, [store, store.seed]);
 
   // Record game start only after first move/action
   useEffect(() => {
@@ -29,7 +35,7 @@ export const Game: React.FC = () => {
         statsStore.recordGameStart();
         recordedSeedRef.current = store.seed;
     }
-  }, [store.history.length, store.seed]);
+  }, [statsStore, store.history.length, store.seed]);
 
   useEffect(() => {
     if (store.gameWon) {
@@ -41,20 +47,18 @@ export const Game: React.FC = () => {
         if (store.seed === today) {
             statsStore.markDailyChallengeCompleted(today);
         }
-
-        setShowStats(true);
     }
-  }, [store.gameWon]);
+  }, [statsStore, store.gameWon, store.moves, store.score, store.seed, store.timer]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
-    if (store.isPlaying && !store.gameWon) {
+    if (isPlaying && !gameWon) {
       interval = setInterval(() => {
-        store.incrementTimer();
+        incrementTimer();
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [store.isPlaying, store.gameWon]);
+  }, [gameWon, incrementTimer, isPlaying]);
 
   const handleCardClick = (pileIndex: number, cardIndex: number) => {
     const pile = store.tableau[pileIndex];
@@ -144,10 +148,11 @@ export const Game: React.FC = () => {
   };
 
 
+  const today = React.useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
   const isDailyCompleted = React.useMemo(() => {
-    const today = format(new Date(), 'yyyy-MM-dd');
     return statsStore.dailyChallengesCompleted.includes(today);
-  }, [statsStore.dailyChallengesCompleted]);
+  }, [statsStore.dailyChallengesCompleted, today]);
+  const isDailyActive = store.seed === today && !store.gameWon;
 
   return (
     <div className="min-h-screen bg-background p-4 flex flex-col gap-6">
@@ -159,6 +164,7 @@ export const Game: React.FC = () => {
         moves={store.moves}
         time={store.timer}
         onPlayAgain={handleNewGame}
+        defaultTab={statsTab}
       />
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
       
@@ -169,11 +175,24 @@ export const Game: React.FC = () => {
             </h1>
             <div className="flex gap-2">
                 <button 
-                    onClick={() => setShowStats(true)}
+                    onClick={() => {
+                      setStatsTab('stats');
+                      setShowStats(true);
+                    }}
                     className="p-2 border-2 border-primary rounded bg-popover text-primary hover:bg-popover/80 shadow-[2px_2px_0px_0px_rgba(0,0,0,0.4)] active:translate-y-[2px] active:shadow-none transition-all"
                     title="Statistics"
                 >
                     <BarChart2 className="w-6 h-6" />
+                </button>
+                <button 
+                    onClick={() => {
+                      setStatsTab('achievements');
+                      setShowStats(true);
+                    }}
+                    className="p-2 border-2 border-primary rounded bg-popover text-primary hover:bg-popover/80 shadow-[2px_2px_0px_0px_rgba(0,0,0,0.4)] active:translate-y-[2px] active:shadow-none transition-all"
+                    title="Achievements"
+                >
+                    <Trophy className="w-6 h-6" />
                 </button>
                 <button 
                     onClick={() => setShowSettings(true)}
@@ -189,8 +208,12 @@ export const Game: React.FC = () => {
                 >
                     <Calendar className="w-6 h-6" />
                     {isDailyCompleted ? (
-                        <div className="absolute -top-2 -right-2 bg-primary rounded-full p-0.5 border border-white z-10">
+                        <div className="absolute -top-2 -right-2 bg-green-600 rounded-full p-0.5 border border-green-300 z-10">
                             <Check className="w-3 h-3 text-white" />
+                        </div>
+                    ) : isDailyActive ? (
+                        <div className="absolute -top-2 -right-2 bg-yellow-400 rounded-full p-0.5 border border-yellow-200 z-10">
+                            <AlertTriangle className="w-3 h-3 text-yellow-900" />
                         </div>
                     ) : (
                         <div className="absolute -top-2 -right-2 bg-red-900 rounded-full p-0.5 border border-red-500 z-10">

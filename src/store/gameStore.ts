@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Card, GameState, TableauPile } from '../types/game';
 import { createDeck, shuffleDeck } from '../lib/utils';
+import { useStatsStore } from './statsStore';
 
 interface GameStore extends GameState {
   initializeGame: (seed?: string) => void;
@@ -154,7 +155,7 @@ export const useGameStore = create<GameStore>()(
         }
     }
 
-    let newFoundation = [...foundation];
+    const newFoundation = [...foundation];
     let newScore = score - 1; 
 
     // Check for completed runs in the target pile
@@ -194,6 +195,7 @@ export const useGameStore = create<GameStore>()(
         isPlaying: true,
         isPaused: false // Auto-resume on move
     });
+    useStatsStore.getState().recordMove();
   },
 
   dealFromStock: () => {
@@ -210,7 +212,7 @@ export const useGameStore = create<GameStore>()(
       const newStock = [...stock];
       const newTableau = [...tableau];
       
-      let newFoundation = [...foundation];
+      const newFoundation = [...foundation];
       let newScore = score; 
 
       // Deal 1 card to each pile
@@ -255,6 +257,7 @@ export const useGameStore = create<GameStore>()(
           isPlaying: !gameWon,
           isPaused: false // Auto-resume on deal
       });
+      useStatsStore.getState().recordDeal();
   },
 
   undo: () => {
@@ -272,6 +275,7 @@ export const useGameStore = create<GameStore>()(
           gameWon: false,
           isPlaying: true
       });
+      useStatsStore.getState().recordUndo();
   },
 
   canUndo: () => get().history.length > 0,
@@ -289,6 +293,7 @@ export const useGameStore = create<GameStore>()(
 
   showHint: () => {
       const { tableau, stock, moves } = get();
+      useStatsStore.getState().recordHint();
       
       let bestMove: { source: { pileIndex: number, cardIndex: number }, target: { pileIndex: number } } | null = null;
       let bestScore = -1;
@@ -474,7 +479,21 @@ export const useGameStore = create<GameStore>()(
     }),
     {
       name: 'spider-solitaire-storage',
-      partialize: (state) => ({ 
+      partialize: (state) => ({
+        tableau: state.tableau,
+        stock: state.stock,
+        foundation: state.foundation,
+        moves: state.moves,
+        score: state.score,
+        timer: state.timer,
+        isPlaying: state.isPlaying,
+        isPaused: state.isPaused,
+        gameWon: state.gameWon,
+        seed: state.seed,
+        history: state.history,
+        hintSource: state.hintSource,
+        hintDeck: state.hintDeck,
+        hintNewGame: state.hintNewGame,
         cardBack: state.cardBack,
         colorScheme: state.colorScheme
       }),

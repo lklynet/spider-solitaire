@@ -57,11 +57,11 @@ export const Card: React.FC<CardProps> = ({ card, index, pileIndex, isSelected, 
       }} 
       onClick={(e: React.MouseEvent) => {
         e.stopPropagation();
+        if (e.detail >= 2) {
+          onDoubleClick?.(pileIndex, index);
+          return;
+        }
         onClick(pileIndex, index);
-      }}
-      onDoubleClick={(e: React.MouseEvent) => {
-        e.stopPropagation();
-        onDoubleClick?.(pileIndex, index);
       }}
     >
       <div className="flex justify-between items-start">

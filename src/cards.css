@@ -54,10 +54,10 @@
 		  radial-gradient(50% 50% at 0 100%,hsl(var(--pattern-bg) / 1) 0%  5% ,hsl(var(--pattern-color-1) / 1) 6%  15%,hsl(var(--pattern-bg) / 1) 16% 25%,hsl(var(--pattern-color-1) / 1) 26% 35%,hsl(var(--pattern-bg) / 1) 36% 45%,
 		   hsl(var(--pattern-color-1) / 1) 46% 55%,hsl(var(--pattern-bg) / 1) 56% 65%,hsl(var(--pattern-color-1) / 1) 66% 75%,hsl(var(--pattern-bg) / 1) 76% 85%,hsl(var(--pattern-color-1) / 1) 86% 95%,
 		   #0000 96%),
-		  radial-gradient(50% 50%,hsl(var(--pattern-bg) / 1) 0%  5% ,hsl(var(--pattern-color-1) / 1) 6%  15%,hsl(var(--pattern-bg) / 1) 16% 25%,hsl(var(--pattern-color-1) / 1) 26% 35%,hsl(var(--pattern-bg) / 1) 36% 45%,
+		  radial-gradient(50% 50% at 50% 50%,hsl(var(--pattern-bg) / 1) 0%  5% ,hsl(var(--pattern-color-1) / 1) 6%  15%,hsl(var(--pattern-bg) / 1) 16% 25%,hsl(var(--pattern-color-1) / 1) 26% 35%,hsl(var(--pattern-bg) / 1) 36% 45%,
 		   hsl(var(--pattern-color-1) / 1) 46% 55%,hsl(var(--pattern-bg) / 1) 56% 65%,hsl(var(--pattern-color-1) / 1) 66% 75%,hsl(var(--pattern-bg) / 1) 76% 85%,hsl(var(--pattern-color-1) / 1) 86% 95%,
 		   #0000 96%),
-		  radial-gradient(50% 50%,hsl(var(--pattern-bg) / 1) 0%  5% ,hsl(var(--pattern-color-1) / 1) 6%  15%,hsl(var(--pattern-bg) / 1) 16% 25%,hsl(var(--pattern-color-1) / 1) 26% 35%,hsl(var(--pattern-bg) / 1) 36% 45%,
+		  radial-gradient(50% 50% at 50% 50%,hsl(var(--pattern-bg) / 1) 0%  5% ,hsl(var(--pattern-color-1) / 1) 6%  15%,hsl(var(--pattern-bg) / 1) 16% 25%,hsl(var(--pattern-color-1) / 1) 26% 35%,hsl(var(--pattern-bg) / 1) 36% 45%,
 		   hsl(var(--pattern-color-1) / 1) 46% 55%,hsl(var(--pattern-bg) / 1) 56% 65%,hsl(var(--pattern-color-1) / 1) 66% 75%,hsl(var(--pattern-bg) / 1) 76% 85%,hsl(var(--pattern-color-1) / 1) 86% 95%,
 		   #0000 96%) 32px 32px;
 	background-size: 64px 64px;
@@ -87,7 +87,7 @@
 	background:
 		  radial-gradient(25% 25% at 25% 25%,hsl(var(--pattern-color-1) / 1) 99%,#0000 101%) 32px 32px/calc(2*32px) calc(2*32px),
 		  radial-gradient(25% 25% at 25% 25%,hsl(var(--pattern-color-1) / 1) 99%,#0000 101%) 0 0/calc(2*32px) calc(2*32px),
-		  radial-gradient(50% 50%,hsl(var(--pattern-bg) / 1) 98%,#0000) 0 0/32px 32px,
+		  radial-gradient(50% 50% at 50% 50%,hsl(var(--pattern-bg) / 1) 98%,#0000) 0 0/32px 32px,
 		  repeating-conic-gradient(hsl(var(--pattern-bg) / 1) 0 25%,hsl(var(--pattern-color-1) / 1) 0 50%) 
 			calc(.5*32px) 0/calc(2*32px) 32px;
 }

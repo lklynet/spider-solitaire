@@ -26,7 +26,7 @@ export const Stock: React.FC<StockProps> = ({ stock, onDeal, isHinted }) => {
   return (
     <div 
         className={cn(
-            "relative w-24 h-36 cursor-pointer group transition-all duration-300",
+            "relative w-24 h-36 cursor-pointer group transition-all duration-300 select-none",
             isHinted && "ring-4 ring-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.5)] scale-105"
         )}
         onDoubleClick={onDeal}
@@ -43,7 +43,7 @@ export const Stock: React.FC<StockProps> = ({ stock, onDeal, isHinted }) => {
                 style={{ top: i * 2, left: i * 2 }}
             />
         ))}
-        <div className="absolute -bottom-6 w-full text-center font-bold">
+        <div className="absolute -bottom-6 w-full text-center font-bold select-none">
             {Math.ceil(stock.length / 10)} Deals
         </div>
     </div>
