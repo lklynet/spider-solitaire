@@ -51,15 +51,6 @@ export const Tableau: React.FC<TableauProps> = ({
                 height: `${totalHeight}px`
             }}
             onClick={() => onEmptyPileClick(pileIndex)}
-            onDoubleClick={() => {
-                if (!onCardDoubleClick) return;
-                for (let i = pile.cards.length - 1; i >= 0; i--) {
-                    if (pile.cards[i].faceUp) {
-                        onCardDoubleClick(pileIndex, i);
-                        break;
-                    }
-                }
-            }}
         >
           {pile.cards.map((card, cardIndex) => {
              const isSelected = selectedPileIndex === pileIndex && selectedCardIndex !== null && cardIndex >= selectedCardIndex;

@@ -12,7 +12,11 @@ import { format } from 'date-fns';
 
 export const Game: React.FC = () => {
   const store = useGameStore();
-  const statsStore = useStatsStore();
+  const recordGameStart = useStatsStore(state => state.recordGameStart);
+  const recordWin = useStatsStore(state => state.recordWin);
+  const recordLoss = useStatsStore(state => state.recordLoss);
+  const markDailyChallengeCompleted = useStatsStore(state => state.markDailyChallengeCompleted);
+  const dailyChallengesCompleted = useStatsStore(state => state.dailyChallengesCompleted);
   const [selectedPileIndex, setSelectedPileIndex] = useState<number | null>(null);
   const [selectedCardIndex, setSelectedCardIndex] = useState<number | null>(null);
   const [showStats, setShowStats] = useState(false);
@@ -32,23 +36,23 @@ export const Game: React.FC = () => {
   // Record game start only after first move/action
   useEffect(() => {
     if (store.history.length > 0 && recordedSeedRef.current !== store.seed) {
-        statsStore.recordGameStart();
+        recordGameStart();
         recordedSeedRef.current = store.seed;
     }
-  }, [statsStore, store.history.length, store.seed]);
+  }, [recordGameStart, store.history.length, store.seed]);
 
   useEffect(() => {
     if (store.gameWon) {
         console.log('Game Won detected in Game.tsx');
-        statsStore.recordWin(store.score, store.timer, store.moves);
+        recordWin(store.score, store.timer, store.moves);
         
         // Check if this was today's daily challenge
         const today = format(new Date(), 'yyyy-MM-dd');
         if (store.seed === today) {
-            statsStore.markDailyChallengeCompleted(today);
+            markDailyChallengeCompleted(today);
         }
     }
-  }, [statsStore, store.gameWon, store.moves, store.score, store.seed, store.timer]);
+  }, [markDailyChallengeCompleted, recordWin, store.gameWon, store.moves, store.score, store.seed, store.timer]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -117,7 +121,7 @@ export const Game: React.FC = () => {
         // Record loss if game was in progress and not won? 
         // Simplified: Just start new game
         if (store.isPlaying && !store.gameWon) {
-            statsStore.recordLoss();
+            recordLoss();
         }
         
         store.initializeGame();
@@ -129,7 +133,7 @@ export const Game: React.FC = () => {
   const handleDailyGame = () => {
       confirmAction(() => {
         if (store.isPlaying && !store.gameWon) {
-            statsStore.recordLoss();
+            recordLoss();
         }
 
         const todaySeed = format(new Date(), 'yyyy-MM-dd');
@@ -150,8 +154,8 @@ export const Game: React.FC = () => {
 
   const today = React.useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
   const isDailyCompleted = React.useMemo(() => {
-    return statsStore.dailyChallengesCompleted.includes(today);
-  }, [statsStore.dailyChallengesCompleted, today]);
+    return dailyChallengesCompleted.includes(today);
+  }, [dailyChallengesCompleted, today]);
   const isDailyActive = store.seed === today && !store.gameWon;
 
   return (
