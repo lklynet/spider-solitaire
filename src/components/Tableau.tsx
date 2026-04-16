@@ -23,28 +23,25 @@ export const Tableau: React.FC<TableauProps> = ({
     onEmptyPileClick 
 }) => {
   return (
-    <div className="flex justify-center gap-4 w-full px-4 overflow-x-auto pb-48">
+    <div className="flex w-full justify-center gap-4 overflow-x-auto px-2 pb-48 xl:justify-between">
       {tableau.map((pile, pileIndex) => {
         // Calculate card positions
         let currentTop = 0;
         const cardPositions = pile.cards.map(card => {
             const pos = currentTop;
-            // Gap for the next card depends on current card state
-            // If current card is face up, we need space to see it (35px)
-            // If current card is face down, we need less space (10px - tight)
-            currentTop += card.faceUp ? 35 : 10;
+            currentTop += card.faceUp ? 30 : 12;
             return pos;
         });
         
         const totalHeight = pile.cards.length > 0 
-            ? cardPositions[pile.cards.length - 1] + 144 + 20 // 144 is card height, 20 buffer
+            ? cardPositions[pile.cards.length - 1] + 144 + 20
             : 150;
 
         return (
         <div 
             key={pile.id} 
             className={cn(
-                "relative w-24 min-h-[150px] rounded-lg flex-shrink-0 transition-colors",
+                "relative min-h-[150px] w-24 flex-shrink-0 rounded-lg transition-colors",
                 pile.cards.length === 0 && "bg-black/20 border-2 border-dashed border-primary/30"
             )}
             style={{

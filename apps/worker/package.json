@@ -1,0 +1,13 @@
+{
+  "name": "@spider/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "pg": "^8.16.3"
+  }
+}

@@ -1,7 +1,11 @@
 {
   "files": [],
   "references": [
+    { "path": "./packages/shared-types/tsconfig.json" },
+    { "path": "./packages/game-engine/tsconfig.json" },
     { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
+    { "path": "./tsconfig.node.json" },
+    { "path": "./apps/api/tsconfig.json" },
+    { "path": "./apps/worker/tsconfig.json" }
   ]
 }

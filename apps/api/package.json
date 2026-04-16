@@ -1,0 +1,20 @@
+{
+  "name": "@spider/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/server.ts",
+    "build": "tsc -b tsconfig.json",
+    "migrate": "tsx src/scripts/migrate.ts"
+  },
+  "dependencies": {
+    "@spider/game-engine": "0.0.0",
+    "@spider/shared-types": "0.0.0",
+    "@fastify/cookie": "^11.0.2",
+    "bcryptjs": "^3.0.2",
+    "fastify": "^5.6.1",
+    "pg": "^8.16.3",
+    "zod": "^4.1.12"
+  }
+}

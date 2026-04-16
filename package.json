@@ -3,9 +3,21 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "vite",
+    "dev:web": "vite",
+    "dev:api": "npm run dev -w @spider/api",
+    "dev:worker": "npm run dev -w @spider/worker",
     "build": "tsc -b && vite build",
+    "build:web": "tsc -b && vite build",
+    "build:api": "npm run build -w @spider/api",
+    "build:worker": "npm run build -w @spider/worker",
+    "migrate:api": "npm run migrate -w @spider/api",
+    "test:replay": "node --import tsx --test packages/game-engine/test/**/*.test.ts",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -21,6 +33,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@types/node": "^24.10.1",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
@@ -31,6 +44,7 @@
     "globals": "^16.5.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
+    "tsx": "^4.20.6",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4"

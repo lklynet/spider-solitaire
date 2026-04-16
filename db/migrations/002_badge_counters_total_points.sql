@@ -1,0 +1,2 @@
+ALTER TABLE badge_counters
+ADD COLUMN IF NOT EXISTS total_points INT NOT NULL DEFAULT 0;

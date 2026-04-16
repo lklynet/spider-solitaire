@@ -1,7 +1,7 @@
 import React from 'react';
-import { useStatsStore, allTimeAchievementChains, dailyAchievementChains, weeklyAchievementChains, getAchievementChainProgressRatio, getAchievementChainStatus, getRankInfo } from '../store/statsStore';
-import type { AchievementChainDefinition } from '../store/statsStore';
-import { X, Trophy, Flame, Timer, Move, Trash2, Gamepad2, Percent, Crown, Zap, Check } from 'lucide-react';
+import { useStatsStore } from '../store/statsStore';
+import { useOfficialStore } from '../store/officialStore';
+import { X, Trophy, Flame, Timer, Move, Trash2, Gamepad2, Percent, Crown, Zap, Shield, Medal, CalendarClock } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface StatsModalProps {
@@ -12,7 +12,7 @@ interface StatsModalProps {
   moves?: number;
   time?: number;
   onPlayAgain?: () => void;
-  defaultTab?: 'stats' | 'achievements';
+  defaultTab?: 'stats' | 'race';
 }
 
 interface StatItemProps {
@@ -41,8 +41,13 @@ export const StatsModal: React.FC<StatsModalProps> = ({
     defaultTab = 'stats'
 }) => {
   const stats = useStatsStore();
+  const profile = useOfficialStore(state => state.profile);
+  const leaderboard = useOfficialStore(state => state.leaderboard);
+  const weeklyLeaderboard = useOfficialStore(state => state.weeklyLeaderboard);
+  const monthlyLeaderboard = useOfficialStore(state => state.monthlyLeaderboard);
+  const globalLeaderboard = useOfficialStore(state => state.globalLeaderboard);
   const refreshPeriods = useStatsStore(state => state.refreshPeriods);
-  const [tab, setTab] = React.useState<'stats' | 'achievements'>(defaultTab);
+  const [tab, setTab] = React.useState<'stats' | 'race'>(defaultTab);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -66,98 +71,19 @@ export const StatsModal: React.FC<StatsModalProps> = ({
     }
   };
 
-  const rankInfo = getRankInfo(stats.rankPoints);
-  const allTimeCompleted = allTimeAchievementChains.reduce((sum, chain) => sum + (stats.allTimeAchievementProgress[chain.id] ?? 0), 0);
-  const allTimeTotal = allTimeAchievementChains.reduce((sum, chain) => sum + chain.tiers.length, 0);
+  const raceHighlights = [
+    { icon: Trophy, label: 'Total Points', value: profile?.badges.totalPoints ?? 0 },
+    { icon: Crown, label: 'Daily Wins', value: profile?.badges.wins1st ?? 0 },
+    { icon: Medal, label: 'Top 3', value: profile?.badges.finishesTop3 ?? 0 },
+    { icon: Shield, label: 'Top 10', value: profile?.badges.finishesTop10 ?? 0 }
+  ];
 
-  const getTierLabel = (chain: AchievementChainDefinition, target: number) => {
-    if (chain.metric.includes('bestTime')) return formatTime(target);
-    if (chain.comparison === 'lte') return `≤ ${target}`;
-    return `${target}`;
-  };
-
-  const getProgressLabel = (chain: AchievementChainDefinition) => {
-    const status = getAchievementChainStatus(stats, chain);
-    if (status.isComplete) return 'Max tier completed';
-    if (chain.metric === 'daily.challengeCompleted') {
-      return status.value ? 'Completed' : 'Not yet';
-    }
-    if (chain.metric.includes('bestTime')) {
-      return `Best ${formatTime(status.value)} / ${formatTime(status.nextTier.target)}`;
-    }
-    if (chain.comparison === 'lte') {
-      return `Best ${status.value || '-'} / ${status.nextTier.target}`;
-    }
-    return `${Math.min(status.value, status.nextTier.target)}/${status.nextTier.target}`;
-  };
-
-  const tierStyles: Record<string, string> = {
-    bronze: 'border-amber-400/60 bg-amber-900/20',
-    silver: 'border-slate-300/60 bg-slate-700/20',
-    gold: 'border-yellow-300/70 bg-yellow-900/20',
-    platinum: 'border-cyan-300/70 bg-cyan-900/20',
-    diamond: 'border-fuchsia-300/70 bg-fuchsia-900/20'
-  };
-
-  const renderAchievement = (achievement: AchievementChainDefinition) => {
-    const status = getAchievementChainStatus(stats, achievement);
-    const complete = status.isComplete;
-    const progress = getAchievementChainProgressRatio(stats, achievement);
-    const tierStyle = tierStyles[status.nextTier.tier];
-    return (
-      <div
-        key={achievement.id}
-        className={cn(
-          "border-2 rounded-xl p-3 shadow-[3px_3px_0px_0px_rgba(0,0,0,0.4)] flex flex-col gap-2",
-          tierStyle,
-          complete ? "bg-primary/20 border-primary" : "bg-popover"
-        )}
-      >
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <div className="text-sm font-black tracking-tight">{achievement.title}</div>
-            <div className="text-[10px] uppercase opacity-70">{achievement.description}</div>
-          </div>
-          <div className={cn(
-            "text-[10px] font-black px-2 py-1 rounded-md border-2 uppercase tracking-wider whitespace-nowrap",
-            complete ? "bg-primary text-primary-foreground border-primary" : "border-primary/40 text-primary/80"
-          )}>
-            {complete ? 'MAXED' : `+${status.nextTier.points} XP`}
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-1">
-          {achievement.tiers.map((tier, index) => (
-            <div
-              key={`${achievement.id}-${tier.target}`}
-              className={cn(
-                "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-wide",
-                index < status.completedCount
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "border-primary/40 text-primary/60"
-              )}
-            >
-              {index < status.completedCount ? <Check className="w-3 h-3" /> : <span className="w-3 h-3" />}
-              {getTierLabel(achievement, tier.target)}
-            </div>
-          ))}
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex-1">
-            <div className="h-2 rounded-full border-2 border-primary/40 bg-black/10 overflow-hidden">
-              <div className="h-full bg-primary" style={{ width: `${Math.round(progress * 100)}%` }} />
-            </div>
-            <div className="mt-1 text-[10px] font-bold uppercase opacity-80">{getProgressLabel(achievement)}</div>
-          </div>
-          <div className={cn(
-            "w-8 h-8 rounded-full border-2 flex items-center justify-center",
-            complete ? "bg-primary text-primary-foreground border-primary" : "border-primary/40 text-primary/60"
-          )}>
-            <Check className="w-4 h-4" />
-          </div>
-        </div>
-      </div>
-    );
-  };
+  const boardSections = [
+    { title: 'Daily', entries: leaderboard, mode: 'time' as const },
+    { title: 'Weekly', entries: weeklyLeaderboard, mode: 'points' as const },
+    { title: 'Monthly', entries: monthlyLeaderboard, mode: 'points' as const },
+    { title: 'Global', entries: globalLeaderboard, mode: 'points' as const }
+  ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -180,7 +106,7 @@ export const StatsModal: React.FC<StatsModalProps> = ({
         <div className="flex flex-col gap-3 h-full min-h-0 pt-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-3xl font-black uppercase tracking-tighter drop-shadow-md">
-              {tab === 'stats' ? 'Statistics' : 'Achievements'}
+              {tab === 'stats' ? 'Casual Stats' : 'Race Summary'}
             </h2>
             <div className="flex gap-2">
               <button
@@ -195,15 +121,15 @@ export const StatsModal: React.FC<StatsModalProps> = ({
                 Stats
               </button>
               <button
-                onClick={() => setTab('achievements')}
+                onClick={() => setTab('race')}
                 className={cn(
                   "px-3 py-2 rounded-lg border-2 font-black uppercase tracking-wider transition-all text-sm",
-                  tab === 'achievements'
+                  tab === 'race'
                     ? "bg-primary text-primary-foreground border-primary shadow-[4px_4px_0px_0px_rgba(0,0,0,0.4)]"
                     : "border-primary/30 text-primary/70 hover:text-primary hover:border-primary"
                 )}
               >
-                Achievements
+                Race
               </button>
             </div>
           </div>
@@ -245,63 +171,86 @@ export const StatsModal: React.FC<StatsModalProps> = ({
                 <StatItem icon={Move} label="Least Moves" value={stats.leastMoves || '-'} color="bg-primary/20" />
                 <StatItem icon={Flame} label="Current Streak" value={stats.currentStreak} color="bg-primary/10" />
                 <StatItem icon={Zap} label="Best Streak" value={stats.bestStreak} color="bg-primary/20" />
+                <StatItem icon={CalendarClock} label="Practice Seeds" value={stats.dailyChallengesCompleted.length} color="bg-primary/10" />
+                <StatItem icon={Shield} label="Total Hints" value={stats.totalHints} color="bg-primary/20" />
+                <StatItem icon={Shield} label="Total Undos" value={stats.totalUndos} color="bg-primary/10" />
+                <StatItem icon={CalendarClock} label="This Week Wins" value={stats.weekly.gamesWon} color="bg-primary/20" />
               </div>
             ) : (
               <div className="flex flex-col gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {raceHighlights.map(({ icon, label, value }, index) => (
+                    <StatItem
+                      key={label}
+                      icon={icon}
+                      label={label}
+                      value={value}
+                      color={index % 2 === 0 ? 'bg-primary/10' : 'bg-primary/20'}
+                    />
+                  ))}
+                </div>
+
                 <div className="border-2 border-primary rounded-xl p-4 bg-primary/10 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.4)]">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <div className="text-[10px] uppercase font-bold opacity-70">Current Rank</div>
-                      <div className="text-2xl font-black">{rankInfo.current.name}</div>
-                      <div className="text-[10px] uppercase tracking-wider opacity-70">XP {stats.rankPoints}</div>
+                  <div className="text-[10px] uppercase font-bold opacity-70">Race Profile</div>
+                  {profile ? (
+                    <>
+                      <div className="mt-1 text-2xl font-black">{profile.user.displayName}</div>
+                      <div className="text-[10px] uppercase tracking-wider opacity-70">@{profile.user.username}</div>
+                      <div className="mt-4 grid md:grid-cols-3 gap-3 text-sm font-bold">
+                        <div className="rounded-lg border-2 border-primary/30 p-3 bg-popover">
+                          Practice Days: {profile.badges.daysPlayed}
+                        </div>
+                        <div className="rounded-lg border-2 border-primary/30 p-3 bg-popover">
+                          Official Submissions: {profile.badges.daysSubmitted}
+                        </div>
+                        <div className="rounded-lg border-2 border-primary/30 p-3 bg-popover">
+                          Top 5 Finishes: {profile.badges.finishesTop5}
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="mt-3 text-sm font-bold opacity-80">
+                      Sign in to see your official race profile and badge totals.
                     </div>
-                    <div className="text-right">
-                      <div className="text-[10px] uppercase font-bold opacity-70">Next Rank</div>
-                      <div className="text-sm font-black">{rankInfo.next ? rankInfo.next.name : 'Max Rank'}</div>
-                      <div className="text-[10px] uppercase opacity-70">
-                        {rankInfo.next ? `${rankInfo.next.minPoints} XP` : 'Complete'}
+                  )}
+                </div>
+
+                <div className="grid lg:grid-cols-2 gap-3">
+                  {boardSections.map((section) => (
+                    <div
+                      key={section.title}
+                      className="border-2 border-primary/30 rounded-xl p-4 bg-popover shadow-[3px_3px_0px_0px_rgba(0,0,0,0.3)]"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-lg font-black">{section.title}</div>
+                        <div className="text-[10px] uppercase opacity-70">
+                          {section.mode === 'time' ? 'Adjusted time' : 'Points'}
+                        </div>
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        {section.entries.length === 0 ? (
+                          <div className="text-sm font-bold opacity-70">No data yet.</div>
+                        ) : (
+                          section.entries.slice(0, 5).map((entry) => (
+                            <div
+                              key={`${section.title}-${entry.userId}`}
+                              className="flex items-center justify-between rounded-lg border border-primary/20 px-3 py-2 bg-black/10"
+                            >
+                              <div>
+                                <div className="text-[10px] uppercase opacity-60">#{entry.rank}</div>
+                                <div className="font-black">{entry.displayName}</div>
+                              </div>
+                              <div className="text-right text-sm font-bold">
+                                {'adjustedTimeMs' in entry
+                                  ? `${Math.round(entry.adjustedTimeMs / 1000)}s`
+                                  : `${entry.points} pts`}
+                              </div>
+                            </div>
+                          ))
+                        )}
                       </div>
                     </div>
-                  </div>
-                  <div className="mt-3 h-2 rounded-full border-2 border-primary/40 bg-black/10 overflow-hidden">
-                    <div className="h-full bg-primary" style={{ width: `${Math.round(rankInfo.progress * 100)}%` }} />
-                  </div>
-                  <div className="mt-2 text-[10px] font-bold uppercase tracking-wider opacity-80">
-                    All-Time: {allTimeCompleted}/{allTimeTotal} milestones
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <div className="text-lg font-black">All-Time Achievements</div>
-                    <div className="text-[10px] uppercase opacity-70">Progress never resets</div>
-                  </div>
-                  <div className="text-[10px] uppercase font-bold opacity-70">Milestones {allTimeCompleted}/{allTimeTotal}</div>
-                </div>
-                <div className="grid md:grid-cols-2 gap-3">
-                  {allTimeAchievementChains.map(renderAchievement)}
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <div className="text-lg font-black">Daily Achievements</div>
-                    <div className="text-[10px] uppercase opacity-70">Resets {stats.daily.date}</div>
-                  </div>
-                  <div className="text-[10px] uppercase font-bold opacity-70">{dailyAchievementChains.length} quests</div>
-                </div>
-                <div className="grid md:grid-cols-2 gap-3">
-                  {dailyAchievementChains.map(renderAchievement)}
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <div className="text-lg font-black">Weekly Achievements</div>
-                    <div className="text-[10px] uppercase opacity-70">Week of {stats.weekly.week}</div>
-                  </div>
-                  <div className="text-[10px] uppercase font-bold opacity-70">{weeklyAchievementChains.length} quests</div>
-                </div>
-                <div className="grid md:grid-cols-2 gap-3">
-                  {weeklyAchievementChains.map(renderAchievement)}
+                  ))}
                 </div>
               </div>
             )}

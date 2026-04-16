@@ -27,7 +27,7 @@ export const Foundation: React.FC<FoundationProps> = ({ foundation }) => {
         <div 
             key={index} 
             className={cn(
-                "w-16 h-24 rounded-lg flex items-center justify-center transition-all",
+                "flex h-24 w-16 items-center justify-center rounded-lg transition-all",
                 suit 
                     ? "bg-white border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]" 
                     : "bg-gray-100/50 border-2 border-dashed border-gray-300"
@@ -39,10 +39,10 @@ export const Foundation: React.FC<FoundationProps> = ({ foundation }) => {
                     (suit === 'hearts' || suit === 'diamonds') ? "text-red-600" : "text-black"
                 )}>
                     <span className="text-xl font-bold">K</span>
-                    <SuitIcon suit={suit} className="w-6 h-6" />
+                    <SuitIcon suit={suit} className="h-6 w-6" />
                 </div>
             ) : (
-                <div className="text-gray-300 font-bold opacity-50">{index + 1}</div>
+                <div className="text-base font-bold text-gray-300 opacity-50">{index + 1}</div>
             )}
         </div>
       ))}

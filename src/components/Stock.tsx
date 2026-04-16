@@ -14,7 +14,7 @@ export const Stock: React.FC<StockProps> = ({ stock, onDeal, isHinted }) => {
 
   if (stock.length === 0) {
     return (
-        <div className="w-24 h-36 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+        <div className="flex h-36 w-24 items-center justify-center rounded-lg border-2 border-dashed border-gray-300">
             <span className="text-gray-400">Empty</span>
         </div>
     );
@@ -26,7 +26,7 @@ export const Stock: React.FC<StockProps> = ({ stock, onDeal, isHinted }) => {
   return (
     <div 
         className={cn(
-            "relative w-24 h-36 cursor-pointer group transition-all duration-300 select-none",
+            "group relative h-36 w-24 cursor-pointer select-none transition-all duration-300",
             isHinted && "ring-4 ring-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.5)] scale-105"
         )}
         onDoubleClick={onDeal}
@@ -36,14 +36,14 @@ export const Stock: React.FC<StockProps> = ({ stock, onDeal, isHinted }) => {
             <div
                 key={i}
                 className={cn(
-                    "absolute w-full h-full border-2 border-black rounded-lg shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-transform",
+                    "absolute h-full w-full rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-transform",
                     "group-hover:translate-x-1 group-hover:translate-y-1",
                     `card-back-${cardBack}`
                 )}
                 style={{ top: i * 2, left: i * 2 }}
             />
         ))}
-        <div className="absolute -bottom-6 w-full text-center font-bold select-none">
+        <div className="absolute -bottom-5 w-full select-none text-center text-xs font-bold">
             {Math.ceil(stock.length / 10)} Deals
         </div>
     </div>

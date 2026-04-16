@@ -33,10 +33,10 @@ export const Card: React.FC<CardProps> = ({ card, index, pileIndex, isSelected, 
     return (
       <div
         className={cn(
-          "absolute w-24 h-36 border-2 border-black rounded-lg shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]",
+          "absolute h-36 w-24 rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]",
           `card-back-${cardBack}`
         )}
-        style={{ top: index * 20, ...style }} // Overlap for face down
+        style={{ top: index * 12, ...style }}
       />
     );
   }
@@ -44,7 +44,7 @@ export const Card: React.FC<CardProps> = ({ card, index, pileIndex, isSelected, 
   return (
     <div
       className={cn(
-        "absolute w-24 h-36 bg-white border-2 border-black rounded-lg cursor-pointer transition-transform select-none touch-none",
+        "absolute h-36 w-24 cursor-pointer select-none touch-none rounded-lg border-2 border-black bg-white transition-transform",
         "flex flex-col justify-between p-2",
         isSelected ? "ring-4 ring-yellow-400 -translate-y-2 z-10 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]" : "shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1",
         isHinted && !isSelected && "ring-4 ring-blue-400 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] -translate-y-1",
@@ -66,19 +66,19 @@ export const Card: React.FC<CardProps> = ({ card, index, pileIndex, isSelected, 
     >
       <div className="flex justify-between items-start">
         <div className="flex flex-col items-center leading-none">
-          <span className="font-bold text-xl">{getRankString(card.rank)}</span>
-          <SuitIcon suit={card.suit} className="w-4 h-4" />
+          <span className="text-xl font-bold">{getRankString(card.rank)}</span>
+          <SuitIcon suit={card.suit} className="h-4 w-4" />
         </div>
       </div>
 
       <div className="absolute inset-0 flex justify-center items-center pointer-events-none opacity-20">
-         <SuitIcon suit={card.suit} className="w-16 h-16" />
+         <SuitIcon suit={card.suit} className="h-16 w-16" />
       </div>
 
       <div className="flex justify-between items-end rotate-180">
         <div className="flex flex-col items-center leading-none">
-          <span className="font-bold text-xl">{getRankString(card.rank)}</span>
-          <SuitIcon suit={card.suit} className="w-4 h-4" />
+          <span className="text-xl font-bold">{getRankString(card.rank)}</span>
+          <SuitIcon suit={card.suit} className="h-4 w-4" />
         </div>
       </div>
     </div>

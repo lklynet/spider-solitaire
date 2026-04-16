@@ -6,9 +6,14 @@ import { Stock } from './Stock';
 import { Foundation } from './Foundation';
 import { Controls } from './Controls';
 import { StatsModal } from './StatsModal';
+import { AuthModal } from './AuthModal';
 import { SettingsModal } from './SettingsModal';
-import { BarChart2, Calendar, Check, AlertTriangle, Palette, Trophy } from 'lucide-react';
+import { RaceSidebar } from './RaceSidebar';
+import { WelcomeGuide } from './WelcomeGuide';
+import { BarChart2, LogIn, LogOut, Palette, UserRound } from 'lucide-react';
 import { format } from 'date-fns';
+import { cn } from '../lib/utils';
+import { useOfficialStore } from '../store/officialStore';
 
 export const Game: React.FC = () => {
   const store = useGameStore();
@@ -16,19 +21,29 @@ export const Game: React.FC = () => {
   const recordWin = useStatsStore(state => state.recordWin);
   const recordLoss = useStatsStore(state => state.recordLoss);
   const markDailyChallengeCompleted = useStatsStore(state => state.markDailyChallengeCompleted);
-  const dailyChallengesCompleted = useStatsStore(state => state.dailyChallengesCompleted);
-  const achievementToasts = useStatsStore(state => state.achievementToasts);
-  const dismissAchievementToast = useStatsStore(state => state.dismissAchievementToast);
   const [selectedPileIndex, setSelectedPileIndex] = useState<number | null>(null);
   const [selectedCardIndex, setSelectedCardIndex] = useState<number | null>(null);
   const [showStats, setShowStats] = useState(false);
-  const [statsTab, setStatsTab] = useState<'stats' | 'achievements'>('stats');
   const [showSettings, setShowSettings] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [selectedMode, setSelectedMode] = useState<'practice' | 'official'>('practice');
   const recordedSeedRef = React.useRef<string | null>(null);
-  const toastTimersRef = React.useRef<Map<string, number>>(new Map());
+  const officialSubmissionRef = React.useRef<string | null>(null);
   const isPlaying = store.isPlaying;
   const gameWon = store.gameWon;
   const incrementTimer = store.incrementTimer;
+  const isOfficialMode = store.playMode === 'official';
+  const playMode = store.playMode;
+  const officialAttemptId = store.officialAttemptId;
+  const officialReplay = store.officialReplay;
+  const clearOfficialMode = store.clearOfficialMode;
+  const refreshOfficial = useOfficialStore(state => state.refreshCurrent);
+  const startOfficialAttempt = useOfficialStore(state => state.startAttempt);
+  const submitOfficialAttempt = useOfficialStore(state => state.submitAttempt);
+  const officialEntry = useOfficialStore(state => state.officialEntry);
+  const officialChallenge = useOfficialStore(state => state.challenge);
+  const sessionUser = useOfficialStore(state => state.sessionUser);
+  const logout = useOfficialStore(state => state.logout);
 
   useEffect(() => {
     if (!store.seed) {
@@ -36,26 +51,47 @@ export const Game: React.FC = () => {
     }
   }, [store, store.seed]);
 
+  useEffect(() => {
+    void refreshOfficial();
+    const intervalId = window.setInterval(() => {
+      void refreshOfficial();
+    }, 30000);
+    return () => window.clearInterval(intervalId);
+  }, [refreshOfficial]);
+
   // Record game start only after first move/action
   useEffect(() => {
-    if (store.history.length > 0 && recordedSeedRef.current !== store.seed) {
+    if (playMode !== 'official' && store.history.length > 0 && recordedSeedRef.current !== store.seed) {
         recordGameStart();
         recordedSeedRef.current = store.seed;
     }
-  }, [recordGameStart, store.history.length, store.seed]);
+  }, [playMode, recordGameStart, store.history.length, store.seed]);
 
   useEffect(() => {
     if (store.gameWon) {
-        console.log('Game Won detected in Game.tsx');
-        recordWin(store.score, store.timer, store.moves);
-        
-        // Check if this was today's daily challenge
-        const today = format(new Date(), 'yyyy-MM-dd');
-        if (store.seed === today) {
-            markDailyChallengeCompleted(today);
+        if (playMode !== 'official') {
+            recordWin(store.score, store.timer, store.moves);
+        }
+
+        if (playMode === 'daily') {
+            const today = format(new Date(), 'yyyy-MM-dd');
+            if (store.seed === today) {
+                markDailyChallengeCompleted(today);
+            }
+        }
+
+        if (playMode === 'official' && officialAttemptId && officialSubmissionRef.current !== officialAttemptId) {
+            officialSubmissionRef.current = officialAttemptId;
+            void submitOfficialAttempt(officialAttemptId, {
+                isWin: true,
+                replayEvents: officialReplay
+            }).finally(() => {
+                clearOfficialMode();
+                void refreshOfficial();
+            });
         }
     }
-  }, [markDailyChallengeCompleted, recordWin, store.gameWon, store.moves, store.score, store.seed, store.timer]);
+  }, [clearOfficialMode, gameWon, markDailyChallengeCompleted, officialAttemptId, officialReplay, playMode, recordWin, refreshOfficial, store.moves, store.score, store.seed, submitOfficialAttempt]);
 
 
   useEffect(() => {
@@ -67,24 +103,6 @@ export const Game: React.FC = () => {
     }
     return () => clearInterval(interval);
   }, [gameWon, incrementTimer, isPlaying]);
-
-  useEffect(() => {
-    const timers = toastTimersRef.current;
-    for (const toast of achievementToasts) {
-      if (timers.has(toast.id)) continue;
-      const timeoutId = window.setTimeout(() => {
-        dismissAchievementToast(toast.id);
-        timers.delete(toast.id);
-      }, 4000);
-      timers.set(toast.id, timeoutId);
-    }
-    return () => {
-      for (const timeoutId of timers.values()) {
-        window.clearTimeout(timeoutId);
-      }
-      timers.clear();
-    };
-  }, [achievementToasts, dismissAchievementToast]);
 
   const handleCardClick = (pileIndex: number, cardIndex: number) => {
     const pile = store.tableau[pileIndex];
@@ -139,9 +157,11 @@ export const Game: React.FC = () => {
   };
 
   const handleNewGame = () => {
+      if (selectedMode === 'official') {
+        void handleStartOfficialRun();
+        return;
+      }
       confirmAction(() => {
-        // Record loss if game was in progress and not won? 
-        // Simplified: Just start new game
         if (store.isPlaying && !store.gameWon) {
             recordLoss();
         }
@@ -152,20 +172,11 @@ export const Game: React.FC = () => {
       });
   };
 
-  const handleDailyGame = () => {
-      confirmAction(() => {
-        if (store.isPlaying && !store.gameWon) {
-            recordLoss();
-        }
-
-        const todaySeed = format(new Date(), 'yyyy-MM-dd');
-        store.initializeGame(todaySeed);
-        setSelectedPileIndex(null);
-        setSelectedCardIndex(null);
-      });
-  };
-
   const handleRestart = () => {
+      if (isOfficialMode) {
+        window.alert('Restart is disabled during the official daily race.');
+        return;
+      }
       confirmAction(() => {
           store.restartGame();
           setSelectedPileIndex(null);
@@ -173,35 +184,96 @@ export const Game: React.FC = () => {
       });
   };
 
+  const handleStartOfficialRun = async () => {
+      if (isOfficialMode) return;
+      if (officialEntry?.hasAttempt) {
+        window.alert('Your official entry has already been used for today.');
+        return;
+      }
+      if (officialChallenge && officialChallenge.status !== 'open') {
+        window.alert('The official daily race is not open yet.');
+        return;
+      }
 
-  const today = React.useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
-  const isDailyCompleted = React.useMemo(() => {
-    return dailyChallengesCompleted.includes(today);
-  }, [dailyChallengesCompleted, today]);
-  const isDailyActive = store.seed === today && !store.gameWon;
+      const startRun = async () => {
+        if (store.isPlaying && !store.gameWon) {
+          recordLoss();
+        }
 
-  const tierStyles = {
-    bronze: "border-[#cd7f32] bg-[#cd7f32]/15 text-[#f6d1a8]",
-    silver: "border-slate-300 bg-slate-200/15 text-slate-100",
-    gold: "border-yellow-300 bg-yellow-300/15 text-yellow-100",
-    platinum: "border-cyan-200 bg-cyan-200/15 text-cyan-50",
-    diamond: "border-purple-300 bg-purple-300/15 text-purple-100"
+        const response = await startOfficialAttempt();
+        officialSubmissionRef.current = null;
+        setSelectedMode('official');
+        store.initializeOfficialGame(response.challenge.seed, response.challenge.id, response.attempt.id);
+        setSelectedPileIndex(null);
+        setSelectedCardIndex(null);
+      };
+
+      if (store.moves > 0 && !store.gameWon) {
+        if (window.confirm('Starting the official run will discard your current board. Continue?')) {
+          await startRun();
+        }
+        return;
+      }
+
+      await startRun();
   };
 
+  const handleAbandonOfficialRun = async () => {
+      if (!isOfficialMode || !store.officialAttemptId) return false;
+
+      const confirmed = window.confirm(
+        'Abandoning the official run will submit a losing result and consume your entry for today. Continue?'
+      );
+      if (!confirmed) return false;
+
+      officialSubmissionRef.current = store.officialAttemptId;
+      await submitOfficialAttempt(store.officialAttemptId, {
+        isWin: false,
+        replayEvents: store.officialReplay
+      });
+      clearOfficialMode();
+      store.initializeGame();
+      setSelectedPileIndex(null);
+      setSelectedCardIndex(null);
+      void refreshOfficial();
+      return true;
+  };
+
+  const handleSelectMode = async (mode: 'practice' | 'official') => {
+      if (mode === selectedMode) return;
+
+      if (mode === 'official' && !isOfficialMode) {
+        setSelectedMode('official');
+        return;
+      }
+
+      if (mode === 'practice' && isOfficialMode) {
+        const abandoned = await handleAbandonOfficialRun();
+        if (!abandoned) return;
+      }
+
+      setSelectedMode(mode);
+  };
+
+  const primaryActionLabel = isOfficialMode
+    ? 'Official Run Live'
+    : selectedMode === 'official'
+      ? officialEntry?.hasAttempt
+        ? 'Entry Used'
+        : officialChallenge?.status === 'open'
+          ? 'Start Official Run'
+          : 'Race Closed'
+      : 'New Game';
+
+  const disablePrimaryAction =
+    isOfficialMode ||
+    (selectedMode === 'official' &&
+      (Boolean(officialEntry?.hasAttempt) || officialChallenge?.status !== 'open'));
+
   return (
-    <div className="min-h-screen bg-background p-4 flex flex-col gap-6">
-      <div className="fixed right-4 top-4 z-[60] flex flex-col gap-3">
-        {achievementToasts.map((toast) => (
-          <div
-            key={toast.id}
-            className={`w-72 border-2 rounded-xl px-4 py-3 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.4)] backdrop-blur-sm ${tierStyles[toast.tier]}`}
-          >
-            <div className="text-xs uppercase tracking-wider font-black opacity-80">Achievement Unlocked</div>
-            <div className="text-base font-black">{toast.title}</div>
-            <div className="text-[11px] uppercase font-bold opacity-80">{toast.tier} tier · +{toast.points} XP</div>
-          </div>
-        ))}
-      </div>
+    <div className="min-h-screen bg-background p-4">
+      <WelcomeGuide />
+      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
       <StatsModal 
         isOpen={showStats || store.showWinModal} 
         onClose={() => {
@@ -213,100 +285,137 @@ export const Game: React.FC = () => {
         moves={store.moves}
         time={store.timer}
         onPlayAgain={handleNewGame}
-        defaultTab={store.showWinModal ? 'stats' : statsTab}
+        defaultTab="stats"
       />
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
-      
-      <header className="flex flex-col md:flex-row justify-between items-center gap-4 max-w-6xl mx-auto w-full">
-        <div className="flex items-center gap-4">
-            <h1 className="text-4xl font-black uppercase tracking-tighter border-b-4 border-primary text-primary pb-2 drop-shadow-lg">
+
+      <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-4 2xl:px-4">
+        <header className="flex flex-col justify-between gap-4 rounded-[24px] border-4 border-primary bg-popover px-4 py-3 shadow-[8px_8px_0px_0px_rgba(0,0,0,0.35)] xl:flex-row xl:items-center">
+          <div className="flex flex-wrap items-center gap-4">
+            <h1 className="border-b-4 border-primary pb-2 text-3xl font-black uppercase tracking-tighter text-primary drop-shadow-lg xl:text-4xl">
                 Spider Solitaire
             </h1>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
                 <button 
-                    onClick={() => {
-                      setStatsTab('stats');
-                      setShowStats(true);
-                    }}
+                    type="button"
+                    onClick={() => void handleSelectMode('practice')}
+                    className={cn(
+                      "rounded-xl border-2 px-3 py-2 text-xs font-black uppercase tracking-[0.18em] transition-all",
+                      selectedMode === 'practice'
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-primary/30 bg-black/10 text-primary"
+                    )}
+                >
+                    Practice
+                </button>
+                <button 
+                    type="button"
+                    onClick={() => void handleSelectMode('official')}
+                    className={cn(
+                      "rounded-xl border-2 px-3 py-2 text-xs font-black uppercase tracking-[0.18em] transition-all",
+                      selectedMode === 'official'
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-primary/30 bg-black/10 text-primary"
+                    )}
+                >
+                    Global Daily
+                </button>
+                <button 
+                    onClick={() => setShowStats(true)}
                     className="p-2 border-2 border-primary rounded bg-popover text-primary hover:bg-popover/80 shadow-[2px_2px_0px_0px_rgba(0,0,0,0.4)] active:translate-y-[2px] active:shadow-none transition-all"
-                    title="Statistics"
+                    title="Profile & Stats"
                 >
                     <BarChart2 className="w-6 h-6" />
                 </button>
                 <button 
-                    onClick={() => {
-                      setStatsTab('achievements');
-                      setShowStats(true);
-                    }}
-                    className="p-2 border-2 border-primary rounded bg-popover text-primary hover:bg-popover/80 shadow-[2px_2px_0px_0px_rgba(0,0,0,0.4)] active:translate-y-[2px] active:shadow-none transition-all"
-                    title="Achievements"
-                >
-                    <Trophy className="w-6 h-6" />
-                </button>
-                <button 
                     onClick={() => setShowSettings(true)}
                     className="p-2 border-2 border-primary rounded bg-popover text-primary hover:bg-popover/80 shadow-[2px_2px_0px_0px_rgba(0,0,0,0.4)] active:translate-y-[2px] active:shadow-none transition-all"
-                    title="Card Designs"
+                    title="Theme"
                 >
                     <Palette className="w-6 h-6" />
                 </button>
-                <button 
-                    onClick={handleDailyGame}
-                    className="relative p-2 border-2 border-primary rounded bg-popover text-primary hover:bg-popover/80 shadow-[2px_2px_0px_0px_rgba(0,0,0,0.4)] active:translate-y-[2px] active:shadow-none transition-all"
-                    title="Daily Challenge"
-                >
-                    <Calendar className="w-6 h-6" />
-                    {isDailyCompleted ? (
-                        <div className="absolute -top-2 -right-2 bg-green-600 rounded-full p-0.5 border border-green-300 z-10">
-                            <Check className="w-3 h-3 text-white" />
-                        </div>
-                    ) : isDailyActive ? (
-                        <div className="absolute -top-2 -right-2 bg-yellow-400 rounded-full p-0.5 border border-yellow-200 z-10">
-                            <AlertTriangle className="w-3 h-3 text-yellow-900" />
-                        </div>
-                    ) : (
-                        <div className="absolute -top-2 -right-2 bg-red-900 rounded-full p-0.5 border border-red-500 z-10">
-                            <AlertTriangle className="w-3 h-3 text-red-500" />
-                        </div>
-                    )}
-                </button>
             </div>
-        </div>
-        <div className="flex gap-4">
-             {/* Foundation Piles */}
-             <Foundation foundation={store.foundation} />
-             {/* Stock */}
-             <Stock stock={store.stock} onDeal={store.dealFromStock} isHinted={store.hintDeck} />
-        </div>
-      </header>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {sessionUser ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowStats(true)}
+                  className="rounded-xl border-2 border-primary/30 bg-black/10 px-3 py-2 text-xs font-black uppercase tracking-[0.16em] text-primary"
+                >
+                  <UserRound className="mr-2 inline h-4 w-4" />
+                  {sessionUser.displayName}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void logout()}
+                  className="rounded-xl border-2 border-primary/30 bg-black/10 px-3 py-2 text-xs font-black uppercase tracking-[0.16em] text-primary"
+                >
+                  <LogOut className="mr-2 inline h-4 w-4" />
+                  Logout
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowAuthModal(true)}
+                className="rounded-xl border-2 border-primary bg-primary px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-primary-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,0.35)]"
+              >
+                <LogIn className="mr-2 inline h-4 w-4" />
+                Login / Register
+              </button>
+            )}
+          </div>
+        </header>
 
-      <Controls 
-        score={store.score}
-        moves={store.moves}
-        timer={store.timer}
-        isPlaying={store.isPlaying}
-        isPaused={store.isPaused}
-        canUndo={store.canUndo()}
-        onUndo={store.undo}
-        onRestart={handleRestart}
-        onNewGame={handleNewGame}
-        onToggleTimer={store.toggleTimer}
-        onTogglePause={store.togglePause}
-        onHint={store.showHint}
-        isNewGameHinted={store.hintNewGame}
-      />
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_390px]">
+          <div className="min-w-0 space-y-5">
+            <Controls 
+              score={store.score}
+              moves={store.moves}
+              timer={store.timer}
+              isPlaying={store.isPlaying}
+              isPaused={store.isPaused}
+              canUndo={store.canUndo()}
+              canPause={!isOfficialMode}
+              disableRestart={isOfficialMode}
+              disableNewGame={disablePrimaryAction}
+              newGameLabel={primaryActionLabel}
+              showScoreAndMoves={!isOfficialMode}
+              hintPenaltyText={isOfficialMode ? '(+15s)' : null}
+              undoPenaltyText={isOfficialMode ? '(+10s)' : null}
+              onUndo={store.undo}
+              onRestart={handleRestart}
+              onNewGame={handleNewGame}
+              onToggleTimer={store.toggleTimer}
+              onTogglePause={store.togglePause}
+              onHint={store.showHint}
+              isNewGameHinted={store.hintNewGame}
+            />
 
-      <main className="flex-1 w-full max-w-7xl mx-auto">
-        <Tableau 
-            tableau={store.tableau}
-            selectedPileIndex={selectedPileIndex}
-            selectedCardIndex={selectedCardIndex}
-            hintSource={store.hintSource}
-            onCardClick={handleCardClick}
-            onCardDoubleClick={handleCardDoubleClick}
-            onEmptyPileClick={handleEmptyPileClick}
-        />
-      </main>
+            <main className="w-full rounded-[24px] border-4 border-primary bg-[linear-gradient(180deg,rgba(0,0,0,0.02),rgba(0,0,0,0.08))] px-3 py-4 shadow-[8px_8px_0px_0px_rgba(0,0,0,0.35)]">
+              <div className="mb-4 flex items-start justify-between gap-4">
+                <Foundation foundation={store.foundation} />
+                <Stock stock={store.stock} onDeal={store.dealFromStock} isHinted={store.hintDeck} />
+              </div>
+              <Tableau 
+                  tableau={store.tableau}
+                  selectedPileIndex={selectedPileIndex}
+                  selectedCardIndex={selectedCardIndex}
+                  hintSource={store.hintSource}
+                  onCardClick={handleCardClick}
+                  onCardDoubleClick={handleCardDoubleClick}
+                  onEmptyPileClick={handleEmptyPileClick}
+              />
+            </main>
+          </div>
+
+          <RaceSidebar
+            selectedMode={selectedMode}
+          />
+        </div>
+      </div>
 
       {/* Game Won Modal removed - consolidated into StatsModal */}
     </div>

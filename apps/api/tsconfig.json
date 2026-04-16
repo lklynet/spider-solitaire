@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "rootDir": "src",
+    "outDir": "dist",
+    "types": ["node"],
+    "baseUrl": "../..",
+    "paths": {
+      "@spider/shared-types": ["packages/shared-types/src/index.ts"],
+      "@spider/shared-types/*": ["packages/shared-types/src/*"],
+      "@spider/game-engine": ["packages/game-engine/src/index.ts"],
+      "@spider/game-engine/*": ["packages/game-engine/src/*"]
+    }
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../../packages/shared-types" },
+    { "path": "../../packages/game-engine" }
+  ]
+}

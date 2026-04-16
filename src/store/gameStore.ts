@@ -1,11 +1,16 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Card, GameState, TableauPile } from '../types/game';
-import { createDeck, shuffleDeck } from '../lib/utils';
+import type { GameState, ReplayEvent } from '../types/game';
+import {
+  checkCompletedRun,
+  createInitialGameLayout,
+  isValidMoveGroup
+} from '@spider/game-engine';
 import { useStatsStore } from './statsStore';
 
 interface GameStore extends GameState {
-  initializeGame: (seed?: string) => void;
+  initializeGame: (seed?: string, mode?: 'casual' | 'daily') => void;
+  initializeOfficialGame: (seed: string, challengeId: string, attemptId: string) => void;
   moveCards: (fromPileIndex: number, toPileIndex: number, cardIndex: number) => void;
   dealFromStock: () => void;
   undo: () => void;
@@ -21,27 +26,14 @@ interface GameStore extends GameState {
   colorScheme: string;
   setColorScheme: (scheme: string) => void;
   setShowWinModal: (show: boolean) => void;
+  playMode: 'casual' | 'daily' | 'official';
+  officialChallengeId: string | null;
+  officialAttemptId: string | null;
+  officialHintCount: number;
+  officialUndoCount: number;
+  officialReplay: ReplayEvent[];
+  clearOfficialMode: () => void;
 }
-
-// Helper to check if a group of cards is valid to move (descending same suit)
-const isValidMoveGroup = (cards: Card[]): boolean => {
-  for (let i = 0; i < cards.length - 1; i++) {
-    if (cards[i].suit !== cards[i + 1].suit) return false;
-    if (cards[i].rank !== cards[i + 1].rank + 1) return false;
-  }
-  return true;
-};
-
-// Helper to check for completed runs (K to A of same suit)
-const checkCompletedRun = (pile: Card[]): boolean => {
-    if (pile.length < 13) return false;
-    
-    const last13 = pile.slice(-13);
-    // Check if it's a perfect run from K down to A
-    if (last13[0].rank !== 13) return false; // Must start with K
-    
-    return isValidMoveGroup(last13);
-};
 
 export const useGameStore = create<GameStore>()(
   persist(
@@ -58,37 +50,21 @@ export const useGameStore = create<GameStore>()(
   showWinModal: false,
   seed: '',
   history: [],
+  playMode: 'casual',
+  officialChallengeId: null,
+  officialAttemptId: null,
+  officialHintCount: 0,
+  officialUndoCount: 0,
+  officialReplay: [],
   cardBack: 1,
   setCardBack: (id) => set({ cardBack: id }),
   colorScheme: 'default',
   setColorScheme: (scheme) => set({ colorScheme: scheme }),
   setShowWinModal: (show) => set({ showWinModal: show }),
 
-  initializeGame: (seed) => {
+  initializeGame: (seed, mode = 'casual') => {
     const finalSeed = seed || Math.random().toString(36).substring(7);
-    const deck = shuffleDeck(createDeck(), finalSeed);
-    
-    // Deal logic
-    const tableau: TableauPile[] = Array.from({ length: 10 }, (_, i) => ({
-      id: i,
-      cards: []
-    }));
-
-    let cardIndex = 0;
-    
-    // Deal initial cards
-    // First 4 piles get 6 cards, next 6 get 5 cards
-    for (let i = 0; i < 10; i++) {
-      const numCards = i < 4 ? 6 : 5;
-      for (let j = 0; j < numCards; j++) {
-        const card = deck[cardIndex++];
-        // Top card is face up
-        card.faceUp = j === numCards - 1;
-        tableau[i].cards.push(card);
-      }
-    }
-
-    const stock = deck.slice(cardIndex);
+    const { tableau, stock } = createInitialGameLayout(finalSeed);
 
     set({
       tableau,
@@ -98,16 +74,47 @@ export const useGameStore = create<GameStore>()(
       score: 500,
       timer: 0,
       isPlaying: false, 
-    isPaused: false,
+      isPaused: false,
       gameWon: false,
       showWinModal: false,
       seed: finalSeed,
-      history: [] // Clear history
+      history: [],
+      playMode: mode,
+      officialChallengeId: null,
+      officialAttemptId: null,
+      officialHintCount: 0,
+      officialUndoCount: 0,
+      officialReplay: []
+    });
+  },
+
+  initializeOfficialGame: (seed, challengeId, attemptId) => {
+    const { tableau, stock } = createInitialGameLayout(seed);
+
+    set({
+      tableau,
+      stock,
+      foundation: [],
+      moves: 0,
+      score: 500,
+      timer: 0,
+      isPlaying: false,
+      isPaused: false,
+      gameWon: false,
+      showWinModal: false,
+      seed,
+      history: [],
+      playMode: 'official',
+      officialChallengeId: challengeId,
+      officialAttemptId: attemptId,
+      officialHintCount: 0,
+      officialUndoCount: 0,
+      officialReplay: []
     });
   },
 
   moveCards: (fromPileIndex, toPileIndex, cardIndex) => {
-    const { tableau, history, moves, score, foundation } = get();
+    const { tableau, history, moves, score, foundation, playMode } = get();
     const fromPile = tableau[fromPileIndex];
     const toPile = tableau[toPileIndex];
     
@@ -198,13 +205,19 @@ export const useGameStore = create<GameStore>()(
         gameWon,
         showWinModal: gameWon,
         isPlaying: true,
-        isPaused: false // Auto-resume on move
+        isPaused: false,
+        officialReplay:
+          playMode === 'official'
+            ? [...get().officialReplay, { type: 'move', fromPileIndex, toPileIndex, cardIndex }]
+            : get().officialReplay
     });
-    useStatsStore.getState().recordMove();
+    if (playMode !== 'official') {
+      useStatsStore.getState().recordMove();
+    }
   },
 
   dealFromStock: () => {
-      const { stock, tableau, history, foundation, score } = get();
+      const { stock, tableau, history, foundation, score, playMode } = get();
       if (stock.length === 0) return;
 
       const newHistory = [...history, {
@@ -261,13 +274,17 @@ export const useGameStore = create<GameStore>()(
           gameWon,
           showWinModal: gameWon,
           isPlaying: !gameWon,
-          isPaused: false // Auto-resume on deal
+          isPaused: false,
+          officialReplay:
+            playMode === 'official' ? [...get().officialReplay, { type: 'deal' }] : get().officialReplay
       });
-      useStatsStore.getState().recordDeal();
+      if (playMode !== 'official') {
+        useStatsStore.getState().recordDeal();
+      }
   },
 
   undo: () => {
-      const { history, moves } = get();
+      const { history, moves, playMode } = get();
       if (history.length === 0) return;
 
       const previousState = history[history.length - 1];
@@ -277,30 +294,45 @@ export const useGameStore = create<GameStore>()(
           ...previousState,
           history: newHistory,
           moves: moves + 1,
-          isPaused: false, // Auto-resume on undo
+          isPaused: false,
           gameWon: false,
           showWinModal: false,
-          isPlaying: true
+          isPlaying: true,
+          officialHintCount: get().officialHintCount,
+          officialUndoCount: get().officialUndoCount + 1,
+          officialReplay: [...get().officialReplay, { type: 'undo' }],
+          playMode: get().playMode,
+          officialChallengeId: get().officialChallengeId,
+          officialAttemptId: get().officialAttemptId
       });
-      useStatsStore.getState().recordUndo();
+      if (playMode !== 'official') {
+        useStatsStore.getState().recordUndo();
+      }
   },
 
   canUndo: () => get().history.length > 0,
 
   toggleTimer: () => set(state => ({ isPlaying: !state.gameWon && !state.isPlaying })),
 
-  togglePause: () => set(state => ({ isPaused: !state.isPaused })),
+  togglePause: () =>
+    set(state => {
+      if (state.playMode === 'official') return state;
+      return { isPaused: !state.isPaused };
+    }),
   
   incrementTimer: () => set(state => ({ timer: state.isPlaying && !state.isPaused && !state.gameWon ? state.timer + 1 : state.timer })),
   
   restartGame: () => {
-      const { seed } = get();
-      get().initializeGame(seed);
+      const { seed, playMode } = get();
+      get().initializeGame(seed, playMode === 'daily' ? 'daily' : 'casual');
   },
 
   showHint: () => {
-      const { tableau, stock, moves } = get();
-      useStatsStore.getState().recordHint();
+      const { tableau, stock, moves, playMode } = get();
+      if (playMode !== 'official') {
+        useStatsStore.getState().recordHint();
+      }
+      const currentOfficialHintCount = get().officialHintCount;
       
       let bestMove: { source: { pileIndex: number, cardIndex: number }, target: { pileIndex: number } } | null = null;
       let bestScore = -1;
@@ -412,7 +444,10 @@ export const useGameStore = create<GameStore>()(
         hintSource, 
         hintDeck, 
         hintNewGame,
-        moves: newMoves
+        moves: newMoves,
+        officialHintCount: get().playMode === 'official' ? currentOfficialHintCount + 1 : currentOfficialHintCount,
+        officialReplay:
+          get().playMode === 'official' ? [...get().officialReplay, { type: 'hint' }] : get().officialReplay
       });
       
       // Auto-clear hint after 2 seconds
@@ -482,7 +517,17 @@ export const useGameStore = create<GameStore>()(
       if (bestTargetIndex !== -1) {
           get().moveCards(fromPileIndex, bestTargetIndex, cardIndex);
       }
-  }
+  },
+
+  clearOfficialMode: () =>
+      set({
+        playMode: 'casual',
+        officialChallengeId: null,
+        officialAttemptId: null,
+        officialHintCount: 0,
+        officialUndoCount: 0,
+        officialReplay: []
+      }),
     }),
     {
       name: 'spider-solitaire-storage',
@@ -498,6 +543,12 @@ export const useGameStore = create<GameStore>()(
         gameWon: state.gameWon,
         seed: state.seed,
         history: state.history,
+        playMode: state.playMode,
+        officialChallengeId: state.officialChallengeId,
+        officialAttemptId: state.officialAttemptId,
+        officialHintCount: state.officialHintCount,
+        officialUndoCount: state.officialUndoCount,
+        officialReplay: state.officialReplay,
         hintSource: state.hintSource,
         hintDeck: state.hintDeck,
         hintNewGame: state.hintNewGame,

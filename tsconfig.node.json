@@ -1,25 +1,24 @@
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
     "target": "ES2023",
     "lib": ["ES2023"],
     "module": "ESNext",
     "types": ["node"],
-    "skipLibCheck": true,
-
-    /* Bundler mode */
+    "baseUrl": ".",
+    "paths": {
+      "@spider/shared-types": ["packages/shared-types/src/index.ts"],
+      "@spider/shared-types/*": ["packages/shared-types/src/*"],
+      "@spider/game-engine": ["packages/game-engine/src/index.ts"],
+      "@spider/game-engine/*": ["packages/game-engine/src/*"]
+    },
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noEmit": true,
-
-    /* Linting */
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
   "include": ["vite.config.ts"]
