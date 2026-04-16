@@ -30,7 +30,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[70] grid place-items-center bg-black/55 p-4 backdrop-blur-[2px]">
+    <div className="fixed inset-0 z-[210] grid place-items-center bg-black/55 p-4 backdrop-blur-[2px]">
       <div className="w-full max-w-md rounded-[28px] border-4 border-primary bg-popover shadow-[10px_10px_0px_0px_rgba(0,0,0,0.4)]">
         <div className="flex items-center justify-between border-b-4 border-primary/20 px-5 py-4">
           <div>
@@ -137,4 +137,3 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     </div>
   );
 };
-

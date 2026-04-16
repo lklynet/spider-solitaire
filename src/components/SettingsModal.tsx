@@ -22,7 +22,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-popover w-full max-w-4xl p-8 border-4 border-primary shadow-[8px_8px_0px_0px_rgba(0,0,0,0.4)] rounded-xl relative text-primary max-h-[90vh] overflow-y-auto">
         <button 
             onClick={onClose}

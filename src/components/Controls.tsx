@@ -11,6 +11,7 @@ interface ControlsProps {
   isPaused: boolean;
   canUndo: boolean;
   canPause?: boolean;
+  disableHint?: boolean;
   disableRestart?: boolean;
   disableNewGame?: boolean;
   newGameLabel?: string;
@@ -34,6 +35,7 @@ export const Controls: React.FC<ControlsProps> = ({
     isPaused,
     canUndo,
     canPause = true,
+    disableHint = false,
     disableRestart = false,
     disableNewGame = false,
     newGameLabel = 'New Game',
@@ -85,7 +87,11 @@ export const Controls: React.FC<ControlsProps> = ({
             </div>
 
             <div className="flex gap-2">
-                 <button onClick={onHint} className="neo-button bg-blue-600 text-white border-primary">
+                 <button
+                    onClick={onHint}
+                    disabled={disableHint}
+                    className="neo-button bg-blue-600 text-white border-primary disabled:opacity-50 disabled:shadow-none disabled:translate-x-[4px] disabled:translate-y-[4px]"
+                 >
                     <Lightbulb className="w-4 h-4 mr-2 inline" /> Hint
                     {hintPenaltyText ? <span className="ml-2 text-[10px] font-black">{hintPenaltyText}</span> : null}
                  </button>

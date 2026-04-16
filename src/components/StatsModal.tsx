@@ -1,7 +1,7 @@
 import React from 'react';
 import { useStatsStore } from '../store/statsStore';
 import { useOfficialStore } from '../store/officialStore';
-import { X, Trophy, Flame, Timer, Move, Trash2, Gamepad2, Percent, Crown, Zap, Shield, Medal, CalendarClock } from 'lucide-react';
+import { X, Trophy, Flame, Timer, Move, Gamepad2, Percent, Crown, Zap, Shield, Medal, CalendarClock } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface StatsModalProps {
@@ -65,12 +65,6 @@ export const StatsModal: React.FC<StatsModalProps> = ({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleReset = () => {
-    if (confirm('Are you sure you want to reset all your statistics? This cannot be undone.')) {
-        stats.resetStats();
-    }
-  };
-
   const raceHighlights = [
     { icon: Trophy, label: 'Total Points', value: profile?.badges.totalPoints ?? 0 },
     { icon: Crown, label: 'Daily Wins', value: profile?.badges.wins1st ?? 0 },
@@ -86,16 +80,8 @@ export const StatsModal: React.FC<StatsModalProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-popover w-full max-w-3xl h-[90vh] p-5 border-4 border-primary shadow-[8px_8px_0px_0px_rgba(0,0,0,0.4)] rounded-xl relative text-primary overflow-hidden">
-        <button 
-            onClick={handleReset}
-            className="absolute top-4 left-4 p-2 z-10 flex items-center justify-center hover:bg-red-900/50 rounded-full border-2 border-transparent hover:border-red-500 text-red-500 transition-all"
-            title="Reset Statistics"
-        >
-            <Trash2 className="w-5 h-5" />
-        </button>
-
         <button 
             onClick={onClose}
             className="absolute top-4 right-4 p-2 z-10 flex items-center justify-center hover:bg-primary/20 rounded-full border-2 border-transparent hover:border-primary transition-all text-primary"
