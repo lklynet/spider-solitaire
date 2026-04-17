@@ -120,7 +120,7 @@ npm run build:worker
 To grant admin access, set `ADMIN_USERNAMES` in `.env` before registering or logging in:
 
 ```bash
-ADMIN_USERNAMES=leekelly,spideradmin
+ADMIN_USERNAMES=spideradmin
 ```
 
 Admins can access verification telemetry and export recent submissions.
