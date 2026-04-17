@@ -148,13 +148,21 @@ This project now runs as a multi-service stack:
 
 A `compose.yaml` file is included in the repository for quick deployment.
 
-1. Create `.env` from `.env.example`
-2. Run the application:
+1. Create `.env` from `.env.example`:
    ```bash
-   docker compose up -d
+   cp .env.example .env
    ```
-
-3. Open your browser and navigate to `http://localhost:8080`.
+2. Edit `.env` with your production values. Do not leave this as an empty file.
+3. Build and run the application:
+   ```bash
+   docker compose up --build -d
+   ```
+4. Verify the stack:
+   ```bash
+   docker compose ps
+   curl http://localhost:8080/api/health
+   ```
+5. Open your browser and navigate to `http://localhost:8080`.
 
 ### Container Notes
 

@@ -3,3 +3,5 @@ dist
 .git
 .DS_Store
 .env
+**/dist
+**/*.tsbuildinfo
