@@ -1,9 +1,7 @@
 import { create } from 'zustand';
 import { format, startOfWeek } from 'date-fns';
 
-const LEGACY_STORAGE_KEY = 'spider-solitaire-stats';
-const GUEST_STORAGE_KEY = 'spider-solitaire-stats:guest';
-const getUserStorageKey = (userId: string) => `spider-solitaire-stats:user:${userId}`;
+const STORAGE_KEY = 'spider-solitaire-stats';
 const getTodayKey = () => format(new Date(), 'yyyy-MM-dd');
 const getWeekKey = () => format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
 
@@ -15,7 +13,6 @@ interface GameStats {
   bestScore: number;
   bestTime: number | null;
   leastMoves: number | null;
-  dailyChallengesCompleted: string[];
 }
 
 export interface DailyStats {
@@ -42,6 +39,16 @@ export interface WeeklyStats {
   bestMoves: number | null;
 }
 
+export interface LastWinSummary {
+  score: number;
+  time: number;
+  moves: number;
+  previousBestTime: number | null;
+  previousLeastMoves: number | null;
+  beatBestTime: boolean;
+  beatLeastMoves: boolean;
+}
+
 interface StatsStore extends GameStats {
   daily: DailyStats;
   weekly: WeeklyStats;
@@ -49,8 +56,7 @@ interface StatsStore extends GameStats {
   totalDeals: number;
   totalHints: number;
   totalUndos: number;
-  storageIdentity: string | null;
-  setStorageIdentity: (userId: string | null) => void;
+  lastWinSummary: LastWinSummary | null;
   recordGameStart: () => void;
   recordWin: (score: number, time: number, moves: number) => void;
   recordLoss: () => void;
@@ -58,15 +64,12 @@ interface StatsStore extends GameStats {
   recordDeal: () => void;
   recordHint: () => void;
   recordUndo: () => void;
-  markDailyChallengeCompleted: (date: string) => void;
   refreshPeriods: () => void;
   resetStats: () => void;
 }
 
 type StatsData = Omit<
   StatsStore,
-  | 'storageIdentity'
-  | 'setStorageIdentity'
   | 'recordGameStart'
   | 'recordWin'
   | 'recordLoss'
@@ -74,7 +77,6 @@ type StatsData = Omit<
   | 'recordDeal'
   | 'recordHint'
   | 'recordUndo'
-  | 'markDailyChallengeCompleted'
   | 'refreshPeriods'
   | 'resetStats'
 >;
@@ -111,13 +113,13 @@ const baseState = (): StatsData => ({
   bestScore: 0,
   bestTime: null,
   leastMoves: null,
-  dailyChallengesCompleted: [],
   daily: createDaily(getTodayKey()),
   weekly: createWeekly(getWeekKey()),
   totalMoves: 0,
   totalDeals: 0,
   totalHints: 0,
-  totalUndos: 0
+  totalUndos: 0,
+  lastWinSummary: null
 });
 
 const normalizePeriods = (state: StatsData) => {
@@ -132,8 +134,6 @@ const normalizePeriods = (state: StatsData) => {
 
 const canUseStorage = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 
-const getStorageKey = (userId: string | null) => (userId ? getUserStorageKey(userId) : GUEST_STORAGE_KEY);
-
 const extractStatsData = (state: StatsStore | StatsData): StatsData => ({
   gamesPlayed: state.gamesPlayed,
   gamesWon: state.gamesWon,
@@ -142,25 +142,21 @@ const extractStatsData = (state: StatsStore | StatsData): StatsData => ({
   bestScore: state.bestScore,
   bestTime: state.bestTime,
   leastMoves: state.leastMoves,
-  dailyChallengesCompleted: [...state.dailyChallengesCompleted],
   daily: { ...state.daily },
   weekly: { ...state.weekly },
   totalMoves: state.totalMoves,
   totalDeals: state.totalDeals,
   totalHints: state.totalHints,
-  totalUndos: state.totalUndos
+  totalUndos: state.totalUndos,
+  lastWinSummary: state.lastWinSummary
 });
 
-const readStoredStats = (userId: string | null): StatsData => {
+const readStoredStats = (): StatsData => {
   if (!canUseStorage()) {
     return baseState();
   }
 
-  const key = getStorageKey(userId);
-  const primary = window.localStorage.getItem(key);
-  const legacy = !userId ? window.localStorage.getItem(LEGACY_STORAGE_KEY) : null;
-  const raw = primary ?? legacy;
-
+  const raw = window.localStorage.getItem(STORAGE_KEY);
   if (!raw) {
     return baseState();
   }
@@ -175,6 +171,7 @@ const readStoredStats = (userId: string | null): StatsData => {
       typeof parsed.state === 'object'
         ? (parsed.state as Partial<StatsData>)
         : ((parsed as Partial<StatsData>) ?? {});
+
     const merged = {
       ...baseState(),
       ...source,
@@ -185,33 +182,24 @@ const readStoredStats = (userId: string | null): StatsData => {
       weekly: {
         ...createWeekly(getWeekKey()),
         ...(source.weekly ?? {})
-      },
-      dailyChallengesCompleted: Array.isArray(source.dailyChallengesCompleted)
-        ? [...source.dailyChallengesCompleted]
-        : []
+      }
     } satisfies StatsData;
 
-    const normalized = {
+    return {
       ...merged,
       ...normalizePeriods(merged)
     } satisfies StatsData;
-
-    if (!primary && legacy && !userId) {
-      window.localStorage.setItem(key, JSON.stringify(normalized));
-    }
-
-    return normalized;
   } catch {
     return baseState();
   }
 };
 
-const writeStoredStats = (userId: string | null, state: StatsData) => {
+const writeStoredStats = (state: StatsData) => {
   if (!canUseStorage()) {
     return;
   }
 
-  window.localStorage.setItem(getStorageKey(userId), JSON.stringify(extractStatsData(state)));
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(extractStatsData(state)));
 };
 
 export const useStatsStore = create<StatsStore>((set) => {
@@ -223,22 +211,13 @@ export const useStatsStore = create<StatsStore>((set) => {
         ...nextPartial
       };
 
-      writeStoredStats(nextState.storageIdentity, extractStatsData(nextState));
+      writeStoredStats(extractStatsData(nextState));
       return nextPartial;
     });
   };
 
   return {
-    ...readStoredStats(null),
-    storageIdentity: null,
-
-    setStorageIdentity: (userId) => {
-      const nextData = readStoredStats(userId);
-      set({
-        ...nextData,
-        storageIdentity: userId
-      });
-    },
+    ...readStoredStats(),
 
     recordGameStart: () => {
       updateAndPersist((state) => {
@@ -265,6 +244,15 @@ export const useStatsStore = create<StatsStore>((set) => {
           bestScore: Math.max(state.bestScore, score),
           bestTime: state.bestTime === null ? time : Math.min(state.bestTime, time),
           leastMoves: state.leastMoves === null ? moves : Math.min(state.leastMoves, moves),
+          lastWinSummary: {
+            score,
+            time,
+            moves,
+            previousBestTime: state.bestTime,
+            previousLeastMoves: state.leastMoves,
+            beatBestTime: state.bestTime === null || time < state.bestTime,
+            beatLeastMoves: state.leastMoves === null || moves < state.leastMoves
+          },
           daily: {
             ...daily,
             gamesWon: daily.gamesWon + 1,
@@ -287,6 +275,7 @@ export const useStatsStore = create<StatsStore>((set) => {
         const { daily, weekly } = normalizePeriods(current);
         return {
           currentStreak: 0,
+          lastWinSummary: null,
           daily,
           weekly
         };
@@ -341,22 +330,6 @@ export const useStatsStore = create<StatsStore>((set) => {
       });
     },
 
-    markDailyChallengeCompleted: (date) => {
-      updateAndPersist((state) => {
-        if (state.dailyChallengesCompleted.includes(date)) {
-          return state;
-        }
-
-        const current = extractStatsData(state);
-        const { daily, weekly } = normalizePeriods(current);
-        return {
-          dailyChallengesCompleted: [...state.dailyChallengesCompleted, date],
-          daily,
-          weekly
-        };
-      });
-    },
-
     refreshPeriods: () => {
       updateAndPersist((state) => {
         const current = extractStatsData(state);
@@ -365,10 +338,7 @@ export const useStatsStore = create<StatsStore>((set) => {
     },
 
     resetStats: () => {
-      updateAndPersist((state) => ({
-        ...baseState(),
-        storageIdentity: state.storageIdentity
-      }));
+      updateAndPersist(() => baseState());
     }
   };
 });

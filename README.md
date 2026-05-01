@@ -2,15 +2,13 @@
 
 <img src="public/spider.svg" width="200" alt="Spider Solitaire" />
 
-A modern, open-source Spider Solitaire app focused on local practice play:
-
-- `Practice`: local-first play with random boards and persistent stats
+A modern, open-source Spider Solitaire app focused on local practice play.
 
 ## Features
 
 - **Classic Gameplay**: Authentic Spider Solitaire rules and mechanics.
 - **Single Local Mode**:
-  - random practice boards
+  - random practice boards with persistent local stats
 - **Smart Features**:
   - undo system
   - smart hints
@@ -65,6 +63,16 @@ npm run dev
 npm run build
 npm run preview
 ```
+
+## Docker Deployment
+
+Run the local-only app as a single containerized web service:
+
+```bash
+docker compose up --build
+```
+
+Then open `http://localhost:8080`.
 
 ### Building for Production
 

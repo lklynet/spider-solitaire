@@ -9,7 +9,6 @@ import { SettingsModal } from './SettingsModal';
 import { StatsModal } from './StatsModal';
 import { Stock } from './Stock';
 import { Tableau } from './Tableau';
-import { WelcomeGuide } from './WelcomeGuide';
 
 export const Game: React.FC = () => {
   const store = useGameStore();
@@ -164,7 +163,6 @@ export const Game: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background p-4">
-      <WelcomeGuide />
       <StatsModal
         isOpen={showStats || store.showWinModal}
         onClose={() => {

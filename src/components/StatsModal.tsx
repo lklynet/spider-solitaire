@@ -1,18 +1,5 @@
 import React from 'react';
-import {
-  CalendarClock,
-  Crown,
-  Flame,
-  Gamepad2,
-  Move,
-  Percent,
-  Shield,
-  Timer,
-  Trophy,
-  X,
-  Zap
-} from 'lucide-react';
-import { cn } from '../lib/utils';
+import { Crown, Flame, Gamepad2, Move, Percent, Timer, Trophy, X, Zap } from 'lucide-react';
 import { useStatsStore } from '../store/statsStore';
 
 interface StatsModalProps {
@@ -25,24 +12,57 @@ interface StatsModalProps {
   onPlayAgain?: () => void;
 }
 
-interface StatItemProps {
+interface SummaryStatProps {
   icon: React.ElementType;
   label: string;
   value: string | number;
-  color: string;
 }
 
-const StatItem = ({ icon: Icon, label, value, color }: StatItemProps) => (
-  <div
-    className={cn(
-      'flex h-full flex-col justify-between rounded-lg border-2 border-primary bg-popover p-3 text-primary shadow-[3px_3px_0px_0px_rgba(0,0,0,0.4)]',
-      color
-    )}
-  >
-    <Icon className="mb-1 h-6 w-6" />
-    <span className="text-center text-[10px] font-bold uppercase opacity-80">{label}</span>
-    <span className="text-xl font-black">{value}</span>
+interface DetailStatProps {
+  icon: React.ElementType;
+  label: string;
+  value: string | number;
+}
+
+interface StatSectionProps {
+  title: string;
+  children: React.ReactNode;
+  columns?: string;
+}
+
+const SummaryStat = ({ icon: Icon, label, value }: SummaryStatProps) => (
+  <div className="rounded-2xl border-2 border-primary/20 bg-black/10 p-4 text-primary">
+    <div className="flex items-center gap-3">
+      <div className="grid h-11 w-11 place-items-center rounded-xl border-2 border-primary/20 bg-popover text-primary">
+        <Icon className="h-5 w-5" />
+      </div>
+      <div className="min-w-0">
+        <div className="text-[10px] font-black uppercase tracking-[0.16em] text-primary/60">{label}</div>
+        <div className="mt-1 text-3xl font-black leading-none text-primary">{value}</div>
+      </div>
+    </div>
   </div>
+);
+
+const DetailStat = ({ icon: Icon, label, value }: DetailStatProps) => (
+  <div className="flex items-center justify-between gap-4 rounded-xl border border-primary/20 bg-popover px-4 py-3 text-primary">
+    <div className="flex items-center gap-3">
+      <div className="grid h-9 w-9 place-items-center rounded-lg border border-primary/20 bg-black/10 text-primary/80">
+        <Icon className="h-4 w-4" />
+      </div>
+      <span className="text-sm font-black uppercase tracking-[0.1em] text-primary/75">{label}</span>
+    </div>
+    <span className="text-lg font-black text-primary">{value}</span>
+  </div>
+);
+
+const StatSection = ({ title, children, columns = 'md:grid-cols-2' }: StatSectionProps) => (
+  <section>
+    <div className="mb-3 text-[10px] font-black uppercase tracking-[0.18em] text-primary/55">
+      {title}
+    </div>
+    <div className={`grid gap-3 ${columns}`}>{children}</div>
+  </section>
 );
 
 export const StatsModal: React.FC<StatsModalProps> = ({
@@ -56,6 +76,7 @@ export const StatsModal: React.FC<StatsModalProps> = ({
 }) => {
   const stats = useStatsStore();
   const refreshPeriods = useStatsStore((state) => state.refreshPeriods);
+  const lastWinSummary = useStatsStore((state) => state.lastWinSummary);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -72,9 +93,11 @@ export const StatsModal: React.FC<StatsModalProps> = ({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const winRate = stats.gamesPlayed > 0 ? `${Math.round((stats.gamesWon / stats.gamesPlayed) * 100)}%` : '0%';
+
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="relative h-[90vh] w-full max-w-3xl overflow-hidden rounded-xl border-4 border-primary bg-popover p-5 text-primary shadow-[8px_8px_0px_0px_rgba(0,0,0,0.4)]">
+      <div className="relative max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-xl border-4 border-primary bg-popover p-5 text-primary shadow-[8px_8px_0px_0px_rgba(0,0,0,0.4)]">
         <button
           onClick={onClose}
           className="absolute right-4 top-4 z-10 flex items-center justify-center rounded-full border-2 border-transparent p-2 text-primary transition-all hover:border-primary hover:bg-primary/20"
@@ -82,14 +105,12 @@ export const StatsModal: React.FC<StatsModalProps> = ({
           <X className="h-5 w-5" />
         </button>
 
-        <div className="flex h-full min-h-0 flex-col gap-3 pt-8">
-          <h2 className="text-3xl font-black uppercase tracking-tighter drop-shadow-md">
-            Local Stats
-          </h2>
+        <div className="flex h-full min-h-0 flex-col gap-5 pt-8">
+          <h2 className="text-3xl font-black uppercase tracking-tighter drop-shadow-md">Stats</h2>
 
           <div className="min-h-0 flex-1 overflow-y-auto pr-2">
             {gameWon && (
-              <div className="mb-4 border-b-2 border-primary/20 pb-4 text-center animate-in zoom-in duration-300">
+              <div className="mb-5 rounded-2xl border-2 border-primary/25 bg-black/10 p-5 text-center animate-in zoom-in duration-300">
                 <h2 className="mb-3 text-4xl font-black text-primary drop-shadow-[3px_3px_0px_rgba(0,0,0,0.4)]">
                   YOU WON!
                 </h2>
@@ -104,6 +125,40 @@ export const StatsModal: React.FC<StatsModalProps> = ({
                     Time: {time !== undefined ? formatTime(time) : '--:--'}
                   </div>
                 </div>
+                {(lastWinSummary?.beatBestTime || lastWinSummary?.beatLeastMoves) && (
+                  <div className="mb-4 grid gap-3 md:grid-cols-2">
+                    {lastWinSummary.beatBestTime && (
+                      <div className="rounded-xl border-2 border-primary/25 bg-popover px-4 py-3 text-left text-primary">
+                        <div className="text-[10px] font-black uppercase tracking-[0.16em] text-primary/60">
+                          New Best Time
+                        </div>
+                        <div className="mt-2 flex items-baseline justify-between gap-4">
+                          <span className="text-sm font-bold text-primary/65">
+                            Prev {formatTime(lastWinSummary.previousBestTime)}
+                          </span>
+                          <span className="text-2xl font-black text-primary">
+                            {formatTime(lastWinSummary.time)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    {lastWinSummary.beatLeastMoves && (
+                      <div className="rounded-xl border-2 border-primary/25 bg-popover px-4 py-3 text-left text-primary">
+                        <div className="text-[10px] font-black uppercase tracking-[0.16em] text-primary/60">
+                          New Least Moves
+                        </div>
+                        <div className="mt-2 flex items-baseline justify-between gap-4">
+                          <span className="text-sm font-bold text-primary/65">
+                            Prev {lastWinSummary.previousLeastMoves ?? '-'}
+                          </span>
+                          <span className="text-2xl font-black text-primary">
+                            {lastWinSummary.moves}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <button
                   onClick={() => {
                     onPlayAgain?.();
@@ -116,24 +171,23 @@ export const StatsModal: React.FC<StatsModalProps> = ({
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <StatItem icon={Gamepad2} label="Games Played" value={stats.gamesPlayed} color="bg-primary/10" />
-              <StatItem icon={Trophy} label="Games Won" value={stats.gamesWon} color="bg-primary/20" />
-              <StatItem
-                icon={Percent}
-                label="Win %"
-                value={stats.gamesPlayed > 0 ? `${Math.round((stats.gamesWon / stats.gamesPlayed) * 100)}%` : '0%'}
-                color="bg-primary/10"
-              />
-              <StatItem icon={Crown} label="Best Score" value={stats.bestScore} color="bg-primary/20" />
-              <StatItem icon={Timer} label="Best Time" value={formatTime(stats.bestTime)} color="bg-primary/10" />
-              <StatItem icon={Move} label="Least Moves" value={stats.leastMoves || '-'} color="bg-primary/20" />
-              <StatItem icon={Flame} label="Current Streak" value={stats.currentStreak} color="bg-primary/10" />
-              <StatItem icon={Zap} label="Best Streak" value={stats.bestStreak} color="bg-primary/20" />
-              <StatItem icon={CalendarClock} label="Today Wins" value={stats.daily.gamesWon} color="bg-primary/10" />
-              <StatItem icon={Shield} label="Total Hints" value={stats.totalHints} color="bg-primary/20" />
-              <StatItem icon={Shield} label="Total Undos" value={stats.totalUndos} color="bg-primary/10" />
-              <StatItem icon={CalendarClock} label="Week Wins" value={stats.weekly.gamesWon} color="bg-primary/20" />
+            <div className="space-y-5">
+              <StatSection title="Overview" columns="md:grid-cols-3">
+                <SummaryStat icon={Gamepad2} label="Games Played" value={stats.gamesPlayed} />
+                <SummaryStat icon={Trophy} label="Games Won" value={stats.gamesWon} />
+                <SummaryStat icon={Percent} label="Win Rate" value={winRate} />
+              </StatSection>
+
+              <StatSection title="Personal Bests" columns="md:grid-cols-3">
+                <SummaryStat icon={Crown} label="Best Score" value={stats.bestScore} />
+                <SummaryStat icon={Timer} label="Best Time" value={formatTime(stats.bestTime)} />
+                <SummaryStat icon={Move} label="Least Moves" value={stats.leastMoves || '-'} />
+              </StatSection>
+
+              <StatSection title="Streaks">
+                <DetailStat icon={Flame} label="Current Streak" value={stats.currentStreak} />
+                <DetailStat icon={Zap} label="Best Streak" value={stats.bestStreak} />
+              </StatSection>
             </div>
           </div>
         </div>
