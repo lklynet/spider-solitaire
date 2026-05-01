@@ -1,5 +1,5 @@
 import React from 'react';
-import { CalendarClock, Flag, Sparkles, Swords, X } from 'lucide-react';
+import { CalendarClock, Sparkles, Swords, X } from 'lucide-react';
 
 const STORAGE_KEY = 'spider-solitaire-race-guide-dismissed';
 
@@ -29,11 +29,11 @@ export const WelcomeGuide: React.FC = () => {
               Welcome
             </div>
             <h2 className="mt-3 text-3xl font-black uppercase tracking-tight text-primary">
-              Two Ways To Play
+              Practice Mode
             </h2>
             <p className="mt-3 text-sm font-bold text-primary/75">
-              Spider Solitaire now has a split identity: local practice for experimenting, and an
-              official race for the global board.
+              Play random boards, track local stats, and restart freely while you work on streaks
+              and faster clears.
             </p>
           </div>
           <div className="p-6">
@@ -41,31 +41,19 @@ export const WelcomeGuide: React.FC = () => {
               <div className="rounded-2xl border-2 border-primary/25 bg-black/10 p-4">
                 <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-primary/60">
                   <Swords className="h-4 w-4" />
-                  Casual / Practice
+                  Practice
                 </div>
                 <div className="mt-2 text-sm font-bold text-primary/80">
-                  Play random boards or the daily practice seed, keep local stats, and restart as
-                  often as you want.
-                </div>
-              </div>
-              <div className="rounded-2xl border-2 border-primary/25 bg-black/10 p-4">
-                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-primary/60">
-                  <Flag className="h-4 w-4" />
-                  Official Daily Race
-                </div>
-                <div className="mt-2 text-sm font-bold text-primary/80">
-                  One official attempt on the daily seed. No pause. Hints and undos add time. Only
-                  verified wins rank.
+                  Start fresh random boards, experiment freely, and restart whenever you want.
                 </div>
               </div>
               <div className="rounded-2xl border-2 border-primary/25 bg-black/10 p-4">
                 <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-primary/60">
                   <CalendarClock className="h-4 w-4" />
-                  Race Hub
+                  Local Stats
                 </div>
                 <div className="mt-2 text-sm font-bold text-primary/80">
-                  Use the Race Hub to browse daily, weekly, monthly, global, profile, and race
-                  history views.
+                  Wins, streaks, best score, and daily or weekly totals are saved in the browser.
                 </div>
               </div>
               <div className="rounded-2xl border-2 border-primary/25 bg-black/10 p-4">
@@ -74,8 +62,7 @@ export const WelcomeGuide: React.FC = () => {
                   Quick Tip
                 </div>
                 <div className="mt-2 text-sm font-bold text-primary/80">
-                  Sign in before starting the official run so your result can be verified and
-                  tracked on the leaderboards.
+                  Use the stats panel to compare streaks, best times, and recent performance.
                 </div>
               </div>
             </div>

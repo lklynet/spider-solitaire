@@ -20,9 +20,6 @@ export const Stock: React.FC<StockProps> = ({ stock, onDeal, isHinted }) => {
     );
   }
 
-  // Calculate how many deals left (10 cards per deal usually, but stock size / 10)
-  // Actually standard spider is 50 cards in stock. 5 deals.
-  
   return (
     <div 
         className={cn(
@@ -43,8 +40,10 @@ export const Stock: React.FC<StockProps> = ({ stock, onDeal, isHinted }) => {
                 style={{ top: i * 2, left: i * 2 }}
             />
         ))}
-        <div className="absolute -bottom-5 w-full select-none text-center text-xs font-bold">
-            {Math.ceil(stock.length / 10)} Deals
+        <div className="absolute right-0.5 top-2.5 z-10">
+            <span className="flex h-9 min-w-9 items-center justify-center rounded-full bg-black/40 px-2 text-xl font-black text-white shadow-[0_2px_0_rgba(0,0,0,0.35)]">
+                {Math.ceil(stock.length / 10)}
+            </span>
         </div>
     </div>
   );

@@ -9,6 +9,7 @@ interface SettingsModalProps {
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const { cardBack, setCardBack, colorScheme, setColorScheme } = useGameStore();
+  const cardDesignIds = Array.from({ length: 15 }, (_, i) => i + 1);
 
   const themes = [
     { id: 'default', label: 'Classic Blue' },
@@ -18,6 +19,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     { id: 'orange', label: 'Orange' },
     { id: 'dark', label: 'Dark Mode' },
   ];
+
+  React.useEffect(() => {
+    if (cardBack > 15) {
+      setCardBack(15);
+    }
+  }, [cardBack, setCardBack]);
 
   if (!isOpen) return null;
 
@@ -32,13 +39,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         </button>
 
         <h2 className="text-4xl font-black mb-6 text-center uppercase tracking-tighter drop-shadow-md">Color Theme</h2>
-        <div className="flex flex-wrap justify-center gap-4 mb-12">
+        <div className="mb-12 grid grid-cols-6 gap-4">
             {themes.map((theme) => (
                 <button
                     key={theme.id}
                     onClick={() => setColorScheme(theme.id)}
                     className={`
-                        px-6 py-3 rounded-xl border-4 font-bold uppercase tracking-wider transition-all
+                        min-w-0 px-3 py-3 rounded-xl border-4 font-bold uppercase tracking-[0.12em] transition-all
                         ${colorScheme === theme.id
                             ? 'border-primary bg-primary text-primary-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] translate-y-[-2px]'
                             : 'border-primary/20 bg-background text-primary/60 hover:border-primary hover:text-primary hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,0.2)]'
@@ -53,7 +60,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         <h2 className="text-4xl font-black mb-8 text-center uppercase tracking-tighter drop-shadow-md">Card Designs</h2>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-            {Array.from({ length: 17 }, (_, i) => i + 1).map((id) => (
+            {cardDesignIds.map((id) => (
                 <button
                     key={id}
                     onClick={() => setCardBack(id)}

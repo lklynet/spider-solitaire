@@ -2,32 +2,15 @@
 
 <img src="public/spider.svg" width="200" alt="Spider Solitaire" />
 
-A modern, open-source Spider Solitaire app with two distinct play styles:
+A modern, open-source Spider Solitaire app focused on local practice play:
 
-- `Casual / Practice`: local-first play, random boards, practice seed, and local stats
-- `Official Daily Race`: one verified daily run, replay validation, global leaderboards, badges, and race history
+- `Practice`: local-first play with random boards and persistent stats
 
 ## Features
 
 - **Classic Gameplay**: Authentic Spider Solitaire rules and mechanics.
-- **Dual Product Modes**:
-  - local casual/practice play with persistent local stats
-  - server-backed official daily race with one entry per player
-- **Verified Official Results**:
-  - official runs are submitted with replay events
-  - server replays the run against the official seed
-  - only verified wins rank
-- **Leaderboards**:
-  - daily
-  - weekly
-  - monthly
-  - global
-  - race history archive
-- **Profiles And Badges**:
-  - wins
-  - top 3 / top 5 / top 10 finishes
-  - verified submissions
-  - total points
+- **Single Local Mode**:
+  - random practice boards
 - **Smart Features**:
   - undo system
   - smart hints
@@ -36,8 +19,7 @@ A modern, open-source Spider Solitaire app with two distinct play styles:
   - multiple color themes
   - customizable card backs
 - **Persistence**:
-  - local game state and casual stats in the browser
-  - official race state in Postgres
+  - local game state and stats in the browser
 
 ## Tech Stack
 
@@ -46,8 +28,6 @@ A modern, open-source Spider Solitaire app with two distinct play styles:
 - **Language**: [TypeScript](https://www.typescriptlang.org/)
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/)
 - **State Management**: [Zustand](https://github.com/pmndrs/zustand)
-- **API**: [Fastify](https://fastify.dev/)
-- **Database**: [PostgreSQL](https://www.postgresql.org/)
 - **Icons**: [Lucide React](https://lucide.dev/)
 - **Utilities**: [date-fns](https://date-fns.org/), [clsx](https://github.com/lukeed/clsx)
 
@@ -71,59 +51,20 @@ A modern, open-source Spider Solitaire app with two distinct play styles:
    npm install
    ```
 
-3. Create a local env file:
-   ```bash
-   cp .env.example .env
-   ```
-
-4. Start Postgres:
-   ```bash
-   docker compose up -d postgres
-   ```
-
-5. Run database migrations:
-   ```bash
-   npm run migrate:api
-   ```
-
-6. Start the API:
-   ```bash
-   npm run dev:api
-   ```
-
-7. Start the worker:
-   ```bash
-   npm run dev:worker
-   ```
-
-8. Start the frontend:
+3. Start the frontend:
    ```bash
    npm run dev
    ```
 
-9. Open your browser and navigate to `http://localhost:5173`.
+4. Open your browser and navigate to `http://localhost:5173`.
 
 ### Dev Commands
 
 ```bash
-npm run dev         # frontend only
-npm run dev:api     # api only
-npm run dev:worker  # worker only
-npm run migrate:api # run SQL migrations
-npm run build       # frontend build
-npm run build:api   # api build
-npm run build:worker
+npm run dev
+npm run build
+npm run preview
 ```
-
-### Admin Accounts
-
-To grant admin access, set `ADMIN_USERNAMES` in `.env` before registering or logging in:
-
-```bash
-ADMIN_USERNAMES=spideradmin
-```
-
-Admins can access verification telemetry and export recent submissions.
 
 ### Building for Production
 
@@ -134,51 +75,6 @@ npm run build
 ```
 
 The build artifacts will be stored in the `dist/` directory.
-
-## Docker Deployment
-
-This project now runs as a multi-service stack:
-
-- `web`
-- `api`
-- `worker`
-- `postgres`
-
-### Using Docker Compose (Recommended)
-
-A `compose.yaml` file is included in the repository for quick deployment.
-
-1. Create `.env` from `.env.example`:
-   ```bash
-   cp .env.example .env
-   ```
-2. Edit `.env` with your production values. Do not leave this as an empty file.
-3. Build and run the application:
-   ```bash
-   docker compose up --build -d
-   ```
-4. Verify the stack:
-   ```bash
-   docker compose ps
-   curl http://localhost:8080/api/health
-   ```
-5. Open your browser and navigate to `http://localhost:8080`.
-
-### Container Notes
-
-- The frontend proxies `/api` to the API container.
-- The API runs migrations on startup in the container image.
-- The worker keeps challenge schedule state current and finalizes closed races.
-- Postgres stores users, sessions, attempts, results, replays, rankings, and badge counters.
-
-### Admin Telemetry And Export
-
-Admin-only API routes:
-
-- `GET /admin/submissions/recent`
-- `GET /admin/submissions/export.csv`
-
-The CSV export is useful for lightweight moderation, verification review, or offline analysis.
 
 ## Open Source
 

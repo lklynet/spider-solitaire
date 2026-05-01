@@ -23,7 +23,7 @@ export const Tableau: React.FC<TableauProps> = ({
     onEmptyPileClick 
 }) => {
   return (
-    <div className="flex w-full justify-center gap-4 overflow-x-auto px-2 pb-48 xl:justify-between">
+    <div className="mx-auto flex w-full max-w-[1128px] justify-center gap-4 overflow-x-auto px-2 pb-48">
       {tableau.map((pile, pileIndex) => {
         // Calculate card positions
         let currentTop = 0;

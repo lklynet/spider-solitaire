@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { GameState, ReplayEvent, TableauPile } from '../types/game';
+import type { GameState, TableauPile } from '../types/game';
 import {
   checkCompletedRun,
   createInitialGameLayout,
@@ -8,42 +8,12 @@ import {
 } from '@spider/game-engine';
 import { useStatsStore } from './statsStore';
 
-type PracticeMode = 'casual' | 'daily';
-type BoardSurface = 'practice' | 'official';
-
-export interface OfficialSubmissionSnapshot {
-  attemptId: string;
-  challengeId: string;
-  challengeDate: string | null;
-  submittedAt: string;
-  rawTimeMs: number;
-  adjustedTimeMs: number;
-  hintCount: number;
-  undoCount: number;
-  isWin: boolean;
-  verificationStatus: string;
-}
-
 interface StoredBoardSnapshot extends GameState {
-  playMode: 'casual' | 'daily' | 'official';
-  officialChallengeId: string | null;
-  officialAttemptId: string | null;
-  officialChallengeDate: string | null;
-  officialHintCount: number;
-  officialUndoCount: number;
-  officialReplay: ReplayEvent[];
-  officialSubmission: OfficialSubmissionSnapshot | null;
+  playMode: 'casual';
 }
 
 interface GameStore extends GameState {
-  initializeGame: (seed?: string, mode?: PracticeMode) => void;
-  initializeOfficialGame: (
-    seed: string,
-    challengeId: string,
-    attemptId: string,
-    challengeDate: string,
-    ownerId: string
-  ) => void;
+  initializeGame: (seed?: string) => void;
   moveCards: (fromPileIndex: number, toPileIndex: number, cardIndex: number) => void;
   dealFromStock: () => void;
   undo: () => void;
@@ -59,25 +29,10 @@ interface GameStore extends GameState {
   colorScheme: string;
   setColorScheme: (scheme: string) => void;
   setShowWinModal: (show: boolean) => void;
-  playMode: 'casual' | 'daily' | 'official';
-  officialChallengeId: string | null;
-  officialAttemptId: string | null;
-  officialChallengeDate: string | null;
-  officialHintCount: number;
-  officialUndoCount: number;
-  officialReplay: ReplayEvent[];
-  officialSubmission: OfficialSubmissionSnapshot | null;
-  currentSurface: BoardSurface;
-  practiceBoard: StoredBoardSnapshot;
-  officialBoard: StoredBoardSnapshot | null;
-  officialBoardOwnerId: string | null;
-  switchToPracticeBoard: () => void;
-  switchToOfficialBoard: () => boolean;
-  freezeOfficialSubmission: (submission: OfficialSubmissionSnapshot) => void;
-  clearOfficialBoard: () => void;
+  playMode: 'casual';
 }
 
-const STORAGE_VERSION = 2;
+const STORAGE_VERSION = 3;
 
 const randomSeed = () => Math.random().toString(36).substring(7);
 
@@ -100,240 +55,81 @@ const createBaseSnapshot = (): StoredBoardSnapshot => ({
   hintSource: undefined,
   hintDeck: false,
   hintNewGame: false,
-  playMode: 'casual',
-  officialChallengeId: null,
-  officialAttemptId: null,
-  officialChallengeDate: null,
-  officialHintCount: 0,
-  officialUndoCount: 0,
-  officialReplay: [],
-  officialSubmission: null
+  playMode: 'casual'
 });
 
 const cloneSnapshot = (snapshot: StoredBoardSnapshot): StoredBoardSnapshot =>
   JSON.parse(JSON.stringify(snapshot)) as StoredBoardSnapshot;
 
-const createPracticeSnapshot = (
-  seed = randomSeed(),
-  mode: PracticeMode = 'casual'
-): StoredBoardSnapshot => {
+const createSnapshot = (seed = randomSeed()): StoredBoardSnapshot => {
   const { tableau, stock } = createInitialGameLayout(seed);
+
   return {
     ...createBaseSnapshot(),
     tableau,
     stock,
-    seed,
-    playMode: mode
+    seed
   };
 };
 
-const createOfficialSnapshot = (
-  seed: string,
-  challengeId: string,
-  attemptId: string,
-  challengeDate: string
-): StoredBoardSnapshot => {
-  const { tableau, stock } = createInitialGameLayout(seed);
-  return {
-    ...createBaseSnapshot(),
-    tableau,
-    stock,
-    seed,
-    playMode: 'official',
-    officialChallengeId: challengeId,
-    officialAttemptId: attemptId,
-    officialChallengeDate: challengeDate
-  };
-};
+const createLegacySnapshot = (rawState: Record<string, unknown>): StoredBoardSnapshot => {
+  const candidate =
+    rawState.practiceBoard && typeof rawState.practiceBoard === 'object'
+      ? (rawState.practiceBoard as Record<string, unknown>)
+      : rawState;
 
-const snapshotFromState = (state: GameStore): StoredBoardSnapshot => ({
-  tableau: JSON.parse(JSON.stringify(state.tableau)),
-  stock: JSON.parse(JSON.stringify(state.stock)),
-  foundation: [...state.foundation],
-  moves: state.moves,
-  score: state.score,
-  timer: state.timer,
-  isPlaying: state.isPlaying,
-  isPaused: state.isPaused,
-  gameWon: state.gameWon,
-  showWinModal: state.showWinModal,
-  seed: state.seed,
-  history: JSON.parse(JSON.stringify(state.history)),
-  hintSource: state.hintSource ? { ...state.hintSource } : undefined,
-  hintDeck: state.hintDeck,
-  hintNewGame: state.hintNewGame,
-  playMode: state.playMode,
-  officialChallengeId: state.officialChallengeId,
-  officialAttemptId: state.officialAttemptId,
-  officialChallengeDate: state.officialChallengeDate,
-  officialHintCount: state.officialHintCount,
-  officialUndoCount: state.officialUndoCount,
-  officialReplay: JSON.parse(JSON.stringify(state.officialReplay)),
-  officialSubmission: state.officialSubmission ? { ...state.officialSubmission } : null
-});
-
-const applySnapshot = (snapshot: StoredBoardSnapshot) => {
-  const next = cloneSnapshot(snapshot);
-  return {
-    tableau: next.tableau,
-    stock: next.stock,
-    foundation: next.foundation,
-    moves: next.moves,
-    score: next.score,
-    timer: next.timer,
-    isPlaying: next.isPlaying,
-    isPaused: next.isPaused,
-    gameWon: next.gameWon,
-    showWinModal: next.showWinModal,
-    seed: next.seed,
-    history: next.history,
-    hintSource: next.hintSource,
-    hintDeck: next.hintDeck,
-    hintNewGame: next.hintNewGame,
-    playMode: next.playMode,
-    officialChallengeId: next.officialChallengeId,
-    officialAttemptId: next.officialAttemptId,
-    officialChallengeDate: next.officialChallengeDate,
-    officialHintCount: next.officialHintCount,
-    officialUndoCount: next.officialUndoCount,
-    officialReplay: next.officialReplay,
-    officialSubmission: next.officialSubmission
-  } satisfies Partial<GameStore>;
-};
-
-const createLegacySnapshot = (state: Record<string, unknown>): StoredBoardSnapshot => {
-  if (!Array.isArray(state.tableau) || !Array.isArray(state.stock) || typeof state.seed !== 'string') {
-    return createPracticeSnapshot();
+  if (
+    !Array.isArray(candidate.tableau) ||
+    !Array.isArray(candidate.stock) ||
+    typeof candidate.seed !== 'string'
+  ) {
+    return createSnapshot();
   }
 
   return {
     ...createBaseSnapshot(),
-    tableau: JSON.parse(JSON.stringify(state.tableau)),
-    stock: JSON.parse(JSON.stringify(state.stock)),
-    foundation: Array.isArray(state.foundation) ? [...state.foundation] : [],
-    moves: typeof state.moves === 'number' ? state.moves : 0,
-    score: typeof state.score === 'number' ? state.score : 500,
-    timer: typeof state.timer === 'number' ? state.timer : 0,
-    isPlaying: Boolean(state.isPlaying),
-    isPaused: Boolean(state.isPaused),
-    gameWon: Boolean(state.gameWon),
-    showWinModal: Boolean(state.showWinModal),
-    seed: String(state.seed),
-    history: Array.isArray(state.history) ? JSON.parse(JSON.stringify(state.history)) : [],
+    tableau: JSON.parse(JSON.stringify(candidate.tableau)),
+    stock: JSON.parse(JSON.stringify(candidate.stock)),
+    foundation: Array.isArray(candidate.foundation) ? [...candidate.foundation] : [],
+    moves: typeof candidate.moves === 'number' ? candidate.moves : 0,
+    score: typeof candidate.score === 'number' ? candidate.score : 500,
+    timer: typeof candidate.timer === 'number' ? candidate.timer : 0,
+    isPlaying: Boolean(candidate.isPlaying),
+    isPaused: Boolean(candidate.isPaused),
+    gameWon: Boolean(candidate.gameWon),
+    showWinModal: Boolean(candidate.showWinModal),
+    seed: candidate.seed,
+    history: Array.isArray(candidate.history) ? JSON.parse(JSON.stringify(candidate.history)) : [],
     hintSource:
-      state.hintSource && typeof state.hintSource === 'object'
-        ? JSON.parse(JSON.stringify(state.hintSource))
+      candidate.hintSource && typeof candidate.hintSource === 'object'
+        ? JSON.parse(JSON.stringify(candidate.hintSource))
         : undefined,
-    hintDeck: Boolean(state.hintDeck),
-    hintNewGame: Boolean(state.hintNewGame),
-    playMode:
-      state.playMode === 'daily' || state.playMode === 'official' ? state.playMode : 'casual',
-    officialChallengeId:
-      typeof state.officialChallengeId === 'string' ? state.officialChallengeId : null,
-    officialAttemptId: typeof state.officialAttemptId === 'string' ? state.officialAttemptId : null,
-    officialChallengeDate:
-      typeof state.officialChallengeDate === 'string' ? state.officialChallengeDate : null,
-    officialHintCount: typeof state.officialHintCount === 'number' ? state.officialHintCount : 0,
-    officialUndoCount: typeof state.officialUndoCount === 'number' ? state.officialUndoCount : 0,
-    officialReplay: Array.isArray(state.officialReplay)
-      ? JSON.parse(JSON.stringify(state.officialReplay))
-      : [],
-    officialSubmission: null
+    hintDeck: Boolean(candidate.hintDeck),
+    hintNewGame: Boolean(candidate.hintNewGame),
+    playMode: 'casual'
   };
 };
 
-const initialPracticeBoard = createPracticeSnapshot();
+const initialSnapshot = createSnapshot();
 
 export const useGameStore = create<GameStore>()(
   persist(
     (set, get) => ({
-      ...applySnapshot(initialPracticeBoard),
-      currentSurface: 'practice',
-      practiceBoard: initialPracticeBoard,
-      officialBoard: null,
-      officialBoardOwnerId: null,
+      ...cloneSnapshot(initialSnapshot),
       cardBack: 1,
       setCardBack: (id) => set({ cardBack: id }),
       colorScheme: 'default',
       setColorScheme: (scheme) => set({ colorScheme: scheme }),
       setShowWinModal: (show) => set({ showWinModal: show }),
 
-      switchToPracticeBoard: () =>
-        set((state) => {
-          const currentSnapshot = snapshotFromState(state);
-          const practiceBoard =
-            state.currentSurface === 'practice' ? currentSnapshot : cloneSnapshot(state.practiceBoard);
-          const officialBoard =
-            state.currentSurface === 'official' ? currentSnapshot : state.officialBoard;
-
-          return {
-            practiceBoard,
-            officialBoard,
-            currentSurface: 'practice',
-            ...applySnapshot(practiceBoard)
-          };
-        }),
-
-      switchToOfficialBoard: () => {
-        const state = get();
-        if (!state.officialBoard) {
-          return false;
-        }
-
-        set(() => {
-          const current = get();
-          const currentSnapshot = snapshotFromState(current);
-          const practiceBoard =
-            current.currentSurface === 'practice'
-              ? currentSnapshot
-              : cloneSnapshot(current.practiceBoard);
-          const officialBoard =
-            current.currentSurface === 'official'
-              ? currentSnapshot
-              : cloneSnapshot(current.officialBoard!);
-
-          return {
-            practiceBoard,
-            officialBoard,
-            currentSurface: 'official',
-            ...applySnapshot(officialBoard)
-          };
-        });
-
-        return true;
-      },
-
-      initializeGame: (seed, mode = 'casual') => {
-        const practiceBoard = createPracticeSnapshot(seed ?? randomSeed(), mode);
-
-        set((state) => ({
-          practiceBoard: cloneSnapshot(practiceBoard),
-          ...(state.currentSurface === 'practice' ? applySnapshot(practiceBoard) : {})
-        }));
-      },
-
-      initializeOfficialGame: (seed, challengeId, attemptId, challengeDate, ownerId) => {
-        const state = get();
-        const practiceBoard =
-          state.currentSurface === 'practice'
-            ? snapshotFromState(state)
-            : cloneSnapshot(state.practiceBoard);
-        const officialBoard = createOfficialSnapshot(seed, challengeId, attemptId, challengeDate);
-
-        set({
-          practiceBoard,
-          officialBoard: cloneSnapshot(officialBoard),
-          officialBoardOwnerId: ownerId,
-          currentSurface: 'official',
-          ...applySnapshot(officialBoard)
-        });
+      initializeGame: (seed) => {
+        set(cloneSnapshot(createSnapshot(seed ?? randomSeed())));
       },
 
       moveCards: (fromPileIndex, toPileIndex, cardIndex) => {
-        const { tableau, history, moves, score, foundation, playMode } = get();
+        const { tableau, history, moves, score, foundation } = get();
         const fromPile = tableau[fromPileIndex];
         const toPile = tableau[toPileIndex];
-
         const cardsToMove = fromPile.cards.slice(cardIndex);
 
         if (!isValidMoveGroup(cardsToMove)) return;
@@ -412,20 +208,14 @@ export const useGameStore = create<GameStore>()(
           gameWon,
           showWinModal: gameWon,
           isPlaying: true,
-          isPaused: false,
-          officialReplay:
-            playMode === 'official'
-              ? [...get().officialReplay, { type: 'move', fromPileIndex, toPileIndex, cardIndex }]
-              : get().officialReplay
+          isPaused: false
         });
 
-        if (playMode !== 'official') {
-          useStatsStore.getState().recordMove();
-        }
+        useStatsStore.getState().recordMove();
       },
 
       dealFromStock: () => {
-        const { stock, tableau, history, foundation, score, playMode } = get();
+        const { stock, tableau, history, foundation, score } = get();
         if (stock.length === 0) return;
 
         const newHistory = [
@@ -440,33 +230,32 @@ export const useGameStore = create<GameStore>()(
 
         const newStock = [...stock];
         const newTableau = [...tableau];
-
         const newFoundation = [...foundation];
         let newScore = score;
 
         for (let i = 0; i < 10; i += 1) {
-          if (newStock.length > 0) {
-            const card = newStock.pop()!;
-            card.faceUp = true;
-            newTableau[i] = {
-              ...newTableau[i],
-              cards: [...newTableau[i].cards, card]
-            };
+          if (newStock.length === 0) break;
 
-            if (checkCompletedRun(newTableau[i].cards)) {
-              const completedSuit = newTableau[i].cards[newTableau[i].cards.length - 1].suit;
+          const card = newStock.pop()!;
+          card.faceUp = true;
+          newTableau[i] = {
+            ...newTableau[i],
+            cards: [...newTableau[i].cards, card]
+          };
 
-              newTableau[i].cards = newTableau[i].cards.slice(0, newTableau[i].cards.length - 13);
-              newFoundation.push(completedSuit);
-              newScore += 100;
+          if (checkCompletedRun(newTableau[i].cards)) {
+            const completedSuit = newTableau[i].cards[newTableau[i].cards.length - 1].suit;
 
-              if (newTableau[i].cards.length > 0) {
-                const lastCard = newTableau[i].cards[newTableau[i].cards.length - 1];
-                if (!lastCard.faceUp) {
-                  const newCards = [...newTableau[i].cards];
-                  newCards[newCards.length - 1] = { ...lastCard, faceUp: true };
-                  newTableau[i].cards = newCards;
-                }
+            newTableau[i].cards = newTableau[i].cards.slice(0, newTableau[i].cards.length - 13);
+            newFoundation.push(completedSuit);
+            newScore += 100;
+
+            if (newTableau[i].cards.length > 0) {
+              const lastCard = newTableau[i].cards[newTableau[i].cards.length - 1];
+              if (!lastCard.faceUp) {
+                const newCards = [...newTableau[i].cards];
+                newCards[newCards.length - 1] = { ...lastCard, faceUp: true };
+                newTableau[i].cards = newCards;
               }
             }
           }
@@ -483,18 +272,14 @@ export const useGameStore = create<GameStore>()(
           gameWon,
           showWinModal: gameWon,
           isPlaying: !gameWon,
-          isPaused: false,
-          officialReplay:
-            playMode === 'official' ? [...get().officialReplay, { type: 'deal' }] : get().officialReplay
+          isPaused: false
         });
 
-        if (playMode !== 'official') {
-          useStatsStore.getState().recordDeal();
-        }
+        useStatsStore.getState().recordDeal();
       },
 
       undo: () => {
-        const { history, moves, playMode } = get();
+        const { history, moves } = get();
         if (history.length === 0) return;
 
         const previousState = history[history.length - 1];
@@ -507,20 +292,10 @@ export const useGameStore = create<GameStore>()(
           isPaused: false,
           gameWon: false,
           showWinModal: false,
-          isPlaying: true,
-          officialHintCount: get().officialHintCount,
-          officialUndoCount: get().officialUndoCount + 1,
-          officialReplay: [...get().officialReplay, { type: 'undo' }],
-          playMode: get().playMode,
-          officialChallengeId: get().officialChallengeId,
-          officialAttemptId: get().officialAttemptId,
-          officialChallengeDate: get().officialChallengeDate,
-          officialSubmission: get().officialSubmission
+          isPlaying: true
         });
 
-        if (playMode !== 'official') {
-          useStatsStore.getState().recordUndo();
-        }
+        useStatsStore.getState().recordUndo();
       },
 
       canUndo: () => get().history.length > 0,
@@ -529,10 +304,7 @@ export const useGameStore = create<GameStore>()(
         set((state) => ({ isPlaying: !state.gameWon && !state.isPlaying })),
 
       togglePause: () =>
-        set((state) => {
-          if (state.playMode === 'official') return state;
-          return { isPaused: !state.isPaused };
-        }),
+        set((state) => ({ isPaused: !state.isPaused })),
 
       incrementTimer: () =>
         set((state) => ({
@@ -541,38 +313,13 @@ export const useGameStore = create<GameStore>()(
         })),
 
       restartGame: () => {
-        const { currentSurface, seed, playMode, officialChallengeId, officialAttemptId, officialChallengeDate } =
-          get();
-
-        if (currentSurface === 'official' && playMode === 'official') {
-          return;
-        }
-
-        get().initializeGame(seed, playMode === 'daily' ? 'daily' : 'casual');
-
-        if (
-          currentSurface === 'official' &&
-          playMode === 'official' &&
-          officialChallengeId &&
-          officialAttemptId &&
-          officialChallengeDate
-        ) {
-          get().initializeOfficialGame(
-            seed,
-            officialChallengeId,
-            officialAttemptId,
-            officialChallengeDate,
-            get().officialBoardOwnerId ?? ''
-          );
-        }
+        const { seed } = get();
+        get().initializeGame(seed);
       },
 
       showHint: () => {
-        const { tableau, stock, moves, playMode } = get();
-        if (playMode !== 'official') {
-          useStatsStore.getState().recordHint();
-        }
-        const currentOfficialHintCount = get().officialHintCount;
+        const { tableau, stock, moves } = get();
+        useStatsStore.getState().recordHint();
 
         let bestMove:
           | { source: { pileIndex: number; cardIndex: number }; target: { pileIndex: number } }
@@ -662,13 +409,7 @@ export const useGameStore = create<GameStore>()(
           hintSource,
           hintDeck,
           hintNewGame,
-          moves: newMoves,
-          officialHintCount:
-            get().playMode === 'official' ? currentOfficialHintCount + 1 : currentOfficialHintCount,
-          officialReplay:
-            get().playMode === 'official'
-              ? [...get().officialReplay, { type: 'hint' }]
-              : get().officialReplay
+          moves: newMoves
         });
 
         setTimeout(() => {
@@ -682,11 +423,9 @@ export const useGameStore = create<GameStore>()(
         if (!fromPile || cardIndex >= fromPile.cards.length) return;
 
         const cardsToMove = fromPile.cards.slice(cardIndex);
-
         if (!isValidMoveGroup(cardsToMove)) return;
 
         const movingCard = cardsToMove[0];
-
         let bestTargetIndex = -1;
         let bestScore = -1;
 
@@ -730,76 +469,17 @@ export const useGameStore = create<GameStore>()(
         if (bestTargetIndex !== -1) {
           get().moveCards(fromPileIndex, bestTargetIndex, cardIndex);
         }
-      },
-
-      freezeOfficialSubmission: (submission) =>
-        set((state) => {
-          const officialBoard = {
-            ...snapshotFromState(state),
-            isPlaying: false,
-            isPaused: false,
-            showWinModal: false,
-            hintSource: undefined,
-            hintDeck: false,
-            hintNewGame: false,
-            officialSubmission: { ...submission }
-          } satisfies StoredBoardSnapshot;
-
-          return {
-            officialBoard: cloneSnapshot(officialBoard),
-            currentSurface: 'official',
-            ...applySnapshot(officialBoard)
-          };
-        }),
-
-      clearOfficialBoard: () =>
-        set((state) => {
-          const practiceBoard =
-            state.currentSurface === 'practice'
-              ? snapshotFromState(state)
-              : cloneSnapshot(state.practiceBoard);
-
-          if (state.currentSurface === 'official') {
-            return {
-              practiceBoard,
-              officialBoard: null,
-              officialBoardOwnerId: null,
-              currentSurface: 'practice',
-              ...applySnapshot(practiceBoard)
-            };
-          }
-
-          return {
-            practiceBoard,
-            officialBoard: null,
-            officialBoardOwnerId: null
-          };
-        })
+      }
     }),
     {
       name: 'spider-solitaire-storage',
       version: STORAGE_VERSION,
-      migrate: (persistedState, version) => {
+      migrate: (persistedState) => {
         const raw = (persistedState ?? {}) as Record<string, unknown>;
-
-        if (version >= STORAGE_VERSION) {
-          return raw;
-        }
-
-        const migratedCurrent = createLegacySnapshot(raw);
-        const currentSurface = migratedCurrent.playMode === 'official' ? 'official' : 'practice';
-        const practiceBoard =
-          currentSurface === 'practice' ? migratedCurrent : createPracticeSnapshot();
-        const officialBoard = currentSurface === 'official' ? migratedCurrent : null;
+        const migrated = createLegacySnapshot(raw);
 
         return {
-          ...raw,
-          ...applySnapshot(migratedCurrent),
-          currentSurface,
-          practiceBoard,
-          officialBoard,
-          officialBoardOwnerId: null,
-          officialSubmission: null,
+          ...migrated,
           cardBack: typeof raw.cardBack === 'number' ? raw.cardBack : 1,
           colorScheme: typeof raw.colorScheme === 'string' ? raw.colorScheme : 'default'
         };
@@ -821,17 +501,6 @@ export const useGameStore = create<GameStore>()(
         hintDeck: state.hintDeck,
         hintNewGame: state.hintNewGame,
         playMode: state.playMode,
-        officialChallengeId: state.officialChallengeId,
-        officialAttemptId: state.officialAttemptId,
-        officialChallengeDate: state.officialChallengeDate,
-        officialHintCount: state.officialHintCount,
-        officialUndoCount: state.officialUndoCount,
-        officialReplay: state.officialReplay,
-        officialSubmission: state.officialSubmission,
-        currentSurface: state.currentSurface,
-        practiceBoard: state.practiceBoard,
-        officialBoard: state.officialBoard,
-        officialBoardOwnerId: state.officialBoardOwnerId,
         cardBack: state.cardBack,
         colorScheme: state.colorScheme
       })

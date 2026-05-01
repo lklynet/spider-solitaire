@@ -30,7 +30,7 @@ export const Foundation: React.FC<FoundationProps> = ({ foundation }) => {
                 "flex h-24 w-16 items-center justify-center rounded-lg transition-all",
                 suit 
                     ? "bg-white border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]" 
-                    : "bg-gray-100/50 border-2 border-dashed border-gray-300"
+                    : "border-2 border-dashed border-white/35 bg-white/12"
             )}
         >
             {suit ? (
@@ -42,7 +42,7 @@ export const Foundation: React.FC<FoundationProps> = ({ foundation }) => {
                     <SuitIcon suit={suit} className="h-6 w-6" />
                 </div>
             ) : (
-                <div className="text-base font-bold text-gray-300 opacity-50">{index + 1}</div>
+                <div className="text-base font-bold text-white/35">{index + 1}</div>
             )}
         </div>
       ))}

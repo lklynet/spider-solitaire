@@ -4,6 +4,7 @@ import { RotateCcw, RefreshCw, Lightbulb, Pause, Play } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface ControlsProps {
+  className?: string;
   score: number;
   moves: number;
   timer: number;
@@ -18,6 +19,7 @@ interface ControlsProps {
   showScoreAndMoves?: boolean;
   hintPenaltyText?: string | null;
   undoPenaltyText?: string | null;
+  showActionButtons?: boolean;
   onUndo: () => void;
   onRestart: () => void;
   onNewGame: () => void;
@@ -28,6 +30,7 @@ interface ControlsProps {
 }
 
 export const Controls: React.FC<ControlsProps> = ({
+    className,
     score,
     moves,
     timer,
@@ -42,6 +45,7 @@ export const Controls: React.FC<ControlsProps> = ({
     showScoreAndMoves = true,
     hintPenaltyText = null,
     undoPenaltyText = null,
+    showActionButtons = true,
     onUndo,
     onRestart,
     onNewGame,
@@ -56,7 +60,7 @@ export const Controls: React.FC<ControlsProps> = ({
     };
 
     return (
-        <div className="neo-box flex w-full flex-wrap items-center justify-between gap-4 rounded-xl p-4">
+        <div className={cn("neo-box flex w-full flex-wrap items-center justify-between gap-4 rounded-xl p-4", className)}>
             <div className="flex gap-6">
                 {showScoreAndMoves && (
                   <>
@@ -78,7 +82,7 @@ export const Controls: React.FC<ControlsProps> = ({
                             onClick={onTogglePause}
                             disabled={!canPause || (!isPlaying && timer === 0)}
                             className="p-1 hover:bg-primary/20 text-primary rounded-full transition-colors disabled:opacity-50"
-                            title={canPause ? (isPaused ? "Resume" : "Pause") : "Pause disabled in official mode"}
+                            title={canPause ? (isPaused ? "Resume" : "Pause") : "Pause unavailable"}
                         >
                             {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
                         </button>
@@ -86,6 +90,7 @@ export const Controls: React.FC<ControlsProps> = ({
                 </div>
             </div>
 
+            {showActionButtons && (
             <div className="flex gap-2">
                  <button
                     onClick={onHint}
@@ -121,6 +126,7 @@ export const Controls: React.FC<ControlsProps> = ({
                     {newGameLabel}
                  </button>
             </div>
+            )}
         </div>
     );
 }
