@@ -7,14 +7,18 @@ interface StockProps {
   stock: CardType[];
   onDeal: () => void;
   isHinted?: boolean;
+  stockRef?: React.RefObject<HTMLDivElement | null>;
 }
 
-export const Stock: React.FC<StockProps> = ({ stock, onDeal, isHinted }) => {
+export const Stock: React.FC<StockProps> = ({ stock, onDeal, isHinted, stockRef }) => {
   const { cardBack } = useGameStore();
 
   if (stock.length === 0) {
     return (
-        <div className="flex h-36 w-24 items-center justify-center rounded-lg border-2 border-dashed border-gray-300">
+        <div
+            ref={stockRef}
+            className="flex h-36 w-24 items-center justify-center rounded-lg border-2 border-dashed border-gray-300"
+        >
             <span className="text-gray-400">Empty</span>
         </div>
     );
@@ -22,6 +26,7 @@ export const Stock: React.FC<StockProps> = ({ stock, onDeal, isHinted }) => {
 
   return (
     <div 
+        ref={stockRef}
         className={cn(
             "group relative h-36 w-24 cursor-pointer select-none transition-all duration-300",
             isHinted && "ring-4 ring-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.5)] scale-105"

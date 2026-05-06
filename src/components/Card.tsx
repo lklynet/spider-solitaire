@@ -10,6 +10,7 @@ interface CardProps {
   pileIndex: number;
   isSelected: boolean;
   isHinted?: boolean;
+  isHidden?: boolean;
   onClick: (pileIndex: number, cardIndex: number) => void;
   onDoubleClick?: (pileIndex: number, cardIndex: number) => void;
   style?: React.CSSProperties;
@@ -25,18 +26,23 @@ const SuitIcon = ({ suit, className }: { suit: string; className?: string }) => 
   }
 };
 
-export const Card: React.FC<CardProps> = ({ card, index, pileIndex, isSelected, isHinted, onClick, onDoubleClick, style }) => {
+export const CardVisual: React.FC<{
+  card: CardType;
+  isSelected?: boolean;
+  isHinted?: boolean;
+  isHidden?: boolean;
+  cardBack: number;
+}> = ({ card, isSelected = false, isHinted = false, isHidden = false, cardBack }) => {
   const isRed = card.suit === 'hearts' || card.suit === 'diamonds';
-  const { cardBack } = useGameStore();
 
   if (!card.faceUp) {
     return (
       <div
         className={cn(
-          "absolute h-36 w-24 rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]",
+          "h-36 w-24 rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-opacity duration-150",
+          isHidden && "opacity-0",
           `card-back-${cardBack}`
         )}
-        style={{ top: index * 12, ...style }}
       />
     );
   }
@@ -44,25 +50,13 @@ export const Card: React.FC<CardProps> = ({ card, index, pileIndex, isSelected, 
   return (
     <div
       className={cn(
-        "absolute h-36 w-24 cursor-pointer select-none touch-none rounded-lg border-2 border-black bg-white transition-transform",
+        "h-36 w-24 cursor-pointer select-none touch-none rounded-lg border-2 border-black bg-white transition-[transform,opacity] duration-150",
         "flex flex-col justify-between p-2",
+        isHidden && "opacity-0",
         isSelected ? "ring-4 ring-yellow-400 -translate-y-2 z-10 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]" : "shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1",
         isHinted && !isSelected && "ring-4 ring-blue-400 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] -translate-y-1",
         isRed ? "text-red-600" : "text-black"
       )}
-      style={{ 
-          top: index * 30, 
-          zIndex: index, 
-          ...style 
-      }} 
-      onClick={(e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (e.detail >= 2) {
-          onDoubleClick?.(pileIndex, index);
-          return;
-        }
-        onClick(pileIndex, index);
-      }}
     >
       <div className="flex justify-between items-start">
         <div className="flex flex-col items-center leading-none">
@@ -81,6 +75,48 @@ export const Card: React.FC<CardProps> = ({ card, index, pileIndex, isSelected, 
           <SuitIcon suit={card.suit} className="h-4 w-4" />
         </div>
       </div>
+    </div>
+  );
+};
+
+export const Card: React.FC<CardProps> = ({
+  card,
+  index,
+  pileIndex,
+  isSelected,
+  isHinted,
+  isHidden,
+  onClick,
+  onDoubleClick,
+  style
+}) => {
+  const { cardBack } = useGameStore();
+
+  return (
+    <div
+      data-card-id={card.id}
+      className="absolute"
+      style={{
+        top: card.faceUp ? index * 30 : index * 12,
+        zIndex: index,
+        ...style
+      }}
+      onClick={(e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (e.detail >= 2) {
+          onDoubleClick?.(pileIndex, index);
+          return;
+        }
+        onClick(pileIndex, index);
+      }}
+    >
+      <CardVisual
+        card={card}
+        isSelected={isSelected}
+        isHinted={isHinted}
+        isHidden={isHidden}
+        cardBack={cardBack}
+      />
     </div>
   );
 };

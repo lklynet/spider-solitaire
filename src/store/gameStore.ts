@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { GameState, TableauPile } from '../types/game';
+import type { Card, GameState, TableauPile } from '../types/game';
 import {
   checkCompletedRun,
   createInitialGameLayout,
@@ -10,6 +10,20 @@ import { useStatsStore } from './statsStore';
 
 interface StoredBoardSnapshot extends GameState {
   playMode: 'casual';
+}
+
+interface CompletedRunAnimation {
+  cards: Card[];
+  pileIndex: number;
+  foundationIndex: number;
+  topOffsets: number[];
+}
+
+interface UiAnimation {
+  id: number;
+  movedCardIds?: string[];
+  dealtCardIds?: string[];
+  completedRuns?: CompletedRunAnimation[];
 }
 
 interface GameStore extends GameState {
@@ -30,6 +44,7 @@ interface GameStore extends GameState {
   setColorScheme: (scheme: string) => void;
   setShowWinModal: (show: boolean) => void;
   playMode: 'casual';
+  lastAnimation: UiAnimation | null;
 }
 
 const STORAGE_VERSION = 3;
@@ -60,6 +75,31 @@ const createBaseSnapshot = (): StoredBoardSnapshot => ({
 
 const cloneSnapshot = (snapshot: StoredBoardSnapshot): StoredBoardSnapshot =>
   JSON.parse(JSON.stringify(snapshot)) as StoredBoardSnapshot;
+
+const getCardTopOffsets = (cards: Card[]): number[] => {
+  let currentTop = 0;
+
+  return cards.map((card) => {
+    const top = currentTop;
+    currentTop += card.faceUp ? 30 : 12;
+    return top;
+  });
+};
+
+const createCompletedRunAnimation = (
+  cards: Card[],
+  pileIndex: number,
+  foundationIndex: number
+): CompletedRunAnimation => {
+  const topOffsets = getCardTopOffsets(cards);
+
+  return {
+    cards: JSON.parse(JSON.stringify(cards)),
+    pileIndex,
+    foundationIndex,
+    topOffsets
+  };
+};
 
 const createSnapshot = (seed = randomSeed()): StoredBoardSnapshot => {
   const { tableau, stock } = createInitialGameLayout(seed);
@@ -121,9 +161,10 @@ export const useGameStore = create<GameStore>()(
       colorScheme: 'default',
       setColorScheme: (scheme) => set({ colorScheme: scheme }),
       setShowWinModal: (show) => set({ showWinModal: show }),
+      lastAnimation: null,
 
       initializeGame: (seed) => {
-        set(cloneSnapshot(createSnapshot(seed ?? randomSeed())));
+        set({ ...cloneSnapshot(createSnapshot(seed ?? randomSeed())), lastAnimation: null });
       },
 
       moveCards: (fromPileIndex, toPileIndex, cardIndex) => {
@@ -174,10 +215,15 @@ export const useGameStore = create<GameStore>()(
 
         const newFoundation = [...foundation];
         let newScore = score - 1;
+        const completedRuns: CompletedRunAnimation[] = [];
 
         const targetPile = newTableau[toPileIndex];
         if (checkCompletedRun(targetPile.cards)) {
+          const completedCards = targetPile.cards.slice(targetPile.cards.length - 13);
           const completedSuit = targetPile.cards[targetPile.cards.length - 1].suit;
+          completedRuns.push(
+            createCompletedRunAnimation(completedCards, toPileIndex, newFoundation.length)
+          );
 
           newTableau[toPileIndex] = {
             ...targetPile,
@@ -208,7 +254,12 @@ export const useGameStore = create<GameStore>()(
           gameWon,
           showWinModal: gameWon,
           isPlaying: true,
-          isPaused: false
+          isPaused: false,
+          lastAnimation: {
+            id: Date.now() + Math.random(),
+            movedCardIds: cardsToMove.map((card) => card.id),
+            completedRuns
+          }
         });
 
         useStatsStore.getState().recordMove();
@@ -232,19 +283,26 @@ export const useGameStore = create<GameStore>()(
         const newTableau = [...tableau];
         const newFoundation = [...foundation];
         let newScore = score;
+        const dealtCardIds: string[] = [];
+        const completedRuns: CompletedRunAnimation[] = [];
 
         for (let i = 0; i < 10; i += 1) {
           if (newStock.length === 0) break;
 
           const card = newStock.pop()!;
           card.faceUp = true;
+          dealtCardIds.push(card.id);
           newTableau[i] = {
             ...newTableau[i],
             cards: [...newTableau[i].cards, card]
           };
 
           if (checkCompletedRun(newTableau[i].cards)) {
+            const completedCards = newTableau[i].cards.slice(newTableau[i].cards.length - 13);
             const completedSuit = newTableau[i].cards[newTableau[i].cards.length - 1].suit;
+            completedRuns.push(
+              createCompletedRunAnimation(completedCards, i, newFoundation.length)
+            );
 
             newTableau[i].cards = newTableau[i].cards.slice(0, newTableau[i].cards.length - 13);
             newFoundation.push(completedSuit);
@@ -272,7 +330,12 @@ export const useGameStore = create<GameStore>()(
           gameWon,
           showWinModal: gameWon,
           isPlaying: !gameWon,
-          isPaused: false
+          isPaused: false,
+          lastAnimation: {
+            id: Date.now() + Math.random(),
+            dealtCardIds,
+            completedRuns
+          }
         });
 
         useStatsStore.getState().recordDeal();
@@ -292,7 +355,8 @@ export const useGameStore = create<GameStore>()(
           isPaused: false,
           gameWon: false,
           showWinModal: false,
-          isPlaying: true
+          isPlaying: true,
+          lastAnimation: null
         });
 
         useStatsStore.getState().recordUndo();
