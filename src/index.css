@@ -89,3 +89,47 @@
 .neo-button {
   @apply px-4 py-2 bg-primary text-primary-foreground font-black uppercase tracking-wider border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,0.4)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,0.4)] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none transition-all;
 }
+
+.card-ghost-move,
+.card-ghost-complete {
+  will-change: transform, opacity;
+  animation-fill-mode: forwards;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.card-ghost-move {
+  animation-name: card-ghost-move;
+}
+
+.card-ghost-complete {
+  animation-name: card-ghost-complete;
+}
+
+@keyframes card-ghost-move {
+  from {
+    transform: translate3d(0px, 0px, 0px) scale(1);
+    opacity: 1;
+  }
+
+  to {
+    transform: translate3d(var(--ghost-end-x), var(--ghost-end-y), 0px) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes card-ghost-complete {
+  0% {
+    transform: translate3d(0px, 0px, 0px) scale(1);
+    opacity: 1;
+  }
+
+  58% {
+    transform: translate3d(var(--ghost-mid-x), var(--ghost-mid-y), 0px) scale(1);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate3d(var(--ghost-end-x), var(--ghost-end-y), 0px) scale(0.72);
+    opacity: 0.92;
+  }
+}

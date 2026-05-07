@@ -10,7 +10,6 @@ interface CardProps {
   pileIndex: number;
   isSelected: boolean;
   isHinted?: boolean;
-  isHidden?: boolean;
   onClick: (pileIndex: number, cardIndex: number) => void;
   onDoubleClick?: (pileIndex: number, cardIndex: number) => void;
   style?: React.CSSProperties;
@@ -85,7 +84,6 @@ export const Card: React.FC<CardProps> = ({
   pileIndex,
   isSelected,
   isHinted,
-  isHidden,
   onClick,
   onDoubleClick,
   style
@@ -114,7 +112,6 @@ export const Card: React.FC<CardProps> = ({
         card={card}
         isSelected={isSelected}
         isHinted={isHinted}
-        isHidden={isHidden}
         cardBack={cardBack}
       />
     </div>

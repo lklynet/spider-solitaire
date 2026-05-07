@@ -39,73 +39,36 @@ const toRectSnapshot = (rect: DOMRect): RectSnapshot => ({
 
 const moveCardDurationMs = 240;
 const completeRunDurationMs = 700;
+const moveCardEasing = 'cubic-bezier(0.22, 1, 0.36, 1)';
 
 const AnimatedCardGhost: React.FC<{
   animation: CardGhostAnimation;
   cardBack: number;
   onComplete: (animation: CardGhostAnimation) => void;
 }> = ({ animation, cardBack, onComplete }) => {
-  const ghostRef = React.useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const node = ghostRef.current;
-    if (!node) return;
-
-    const { startRect, midRect, endRect, duration } = animation;
-    const keyframes = midRect
-      ? [
-          {
-            transform: 'translate3d(0px, 0px, 0px) scale(1)',
-            opacity: 1,
-            offset: 0
-          },
-          {
-            transform: `translate3d(${midRect.left - startRect.left}px, ${midRect.top - startRect.top}px, 0px) scale(1)`,
-            opacity: 1,
-            offset: 0.58
-          },
-          {
-            transform: `translate3d(${endRect.left - startRect.left}px, ${endRect.top - startRect.top}px, 0px) scale(0.72)`,
-            opacity: 0.92,
-            offset: 1
-          }
-        ]
-      : [
-          {
-            transform: 'translate3d(0px, 0px, 0px)',
-            opacity: 1
-          },
-          {
-            transform: `translate3d(${endRect.left - startRect.left}px, ${endRect.top - startRect.top}px, 0px)`,
-            opacity: 1
-          }
-        ];
-
-    const motion = node.animate(keyframes, {
-      duration,
-      easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
-      fill: 'forwards'
-    });
-
-    motion.onfinish = () => onComplete(animation);
-    motion.oncancel = () => onComplete(animation);
-
-    return () => {
-      motion.cancel();
-    };
-  }, [animation, onComplete]);
+  const deltaX = animation.endRect.left - animation.startRect.left;
+  const deltaY = animation.endRect.top - animation.startRect.top;
+  const midDeltaX = animation.midRect ? animation.midRect.left - animation.startRect.left : deltaX;
+  const midDeltaY = animation.midRect ? animation.midRect.top - animation.startRect.top : deltaY;
+  const animationClassName = animation.midRect ? 'card-ghost-complete' : 'card-ghost-move';
+  const ghostStyle: React.CSSProperties & Record<string, string | number> = {
+    left: animation.startRect.left,
+    top: animation.startRect.top,
+    width: animation.startRect.width,
+    height: animation.startRect.height,
+    zIndex: animation.zIndex,
+    animationDuration: `${animation.duration}ms`,
+    '--ghost-mid-x': `${midDeltaX}px`,
+    '--ghost-mid-y': `${midDeltaY}px`,
+    '--ghost-end-x': `${deltaX}px`,
+    '--ghost-end-y': `${deltaY}px`
+  };
 
   return (
     <div
-      ref={ghostRef}
-      className="pointer-events-none fixed left-0 top-0"
-      style={{
-        left: animation.startRect.left,
-        top: animation.startRect.top,
-        width: animation.startRect.width,
-        height: animation.startRect.height,
-        zIndex: animation.zIndex
-      }}
+      className={`pointer-events-none fixed left-0 top-0 ${animationClassName}`}
+      style={ghostStyle}
+      onAnimationEnd={() => onComplete(animation)}
     >
       <CardVisual card={animation.card} cardBack={cardBack} />
     </div>
@@ -123,7 +86,6 @@ export const Game: React.FC = () => {
   const [showStats, setShowStats] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [ghosts, setGhosts] = useState<CardGhostAnimation[]>([]);
-  const [hiddenCardIds, setHiddenCardIds] = useState<Set<string>>(new Set());
   const [hiddenFoundationSlots, setHiddenFoundationSlots] = useState<Set<number>>(new Set());
   const recordedSeedRef = React.useRef<string | null>(null);
   const boardRef = React.useRef<HTMLDivElement | null>(null);
@@ -193,25 +155,24 @@ export const Game: React.FC = () => {
 
       if (Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1) return;
 
-      element.animate(
-        [
-          { transform: `translate3d(${deltaX}px, ${deltaY}px, 0px)` },
-          { transform: 'translate3d(0px, 0px, 0px)' }
-        ],
-        {
-          duration: moveCardDurationMs,
-          easing: 'cubic-bezier(0.22, 1, 0.36, 1)'
-        }
-      );
+      element.style.transition = 'none';
+      element.style.transform = `translate3d(${deltaX}px, ${deltaY}px, 0px)`;
+      element.getBoundingClientRect();
+      element.style.transition = `transform ${moveCardDurationMs}ms ${moveCardEasing}`;
+      element.style.transform = 'translate3d(0px, 0px, 0px)';
+
+      const cleanup = () => {
+        element.style.transition = '';
+        element.style.transform = '';
+        element.removeEventListener('transitionend', cleanup);
+      };
+
+      element.addEventListener('transitionend', cleanup, { once: true });
     });
 
     const animation = store.lastAnimation;
     if (animation && lastAnimatedActionRef.current !== animation.id) {
-      const completedCardIds = new Set(
-        animation.completedRuns?.flatMap((run) => run.cards.map((card) => card.id)) ?? []
-      );
       const nextGhosts: CardGhostAnimation[] = [];
-      const nextHiddenCardIds = new Set<string>();
       const stockRect = stockRef.current?.getBoundingClientRect();
 
       const buildStockStartRect = (index: number): RectSnapshot | null => {
@@ -225,47 +186,7 @@ export const Game: React.FC = () => {
         };
       };
 
-      const movedCardIds = animation.movedCardIds ?? [];
-      movedCardIds.forEach((cardId) => {
-        if (completedCardIds.has(cardId)) return;
-
-        const startRect = previousRects.get(cardId);
-        const endRect = currentRects.get(cardId);
-        const ghostIndex = nextGhosts.length;
-        const card = store.tableau.flatMap((pile) => pile.cards).find((candidate) => candidate.id === cardId);
-        if (!startRect || !endRect || !card) return;
-
-        nextGhosts.push({
-          key: `${animation.id}-${cardId}-move`,
-          card,
-          startRect,
-          endRect,
-          duration: moveCardDurationMs,
-          zIndex: 400 + ghostIndex
-        });
-        nextHiddenCardIds.add(cardId);
-      });
-
       const dealtCardIds = animation.dealtCardIds ?? [];
-      dealtCardIds.forEach((cardId, index) => {
-        if (completedCardIds.has(cardId)) return;
-
-        const startRect = buildStockStartRect(index);
-        const endRect = currentRects.get(cardId);
-        const ghostIndex = nextGhosts.length;
-        const card = store.tableau.flatMap((pile) => pile.cards).find((candidate) => candidate.id === cardId);
-        if (!startRect || !endRect || !card) return;
-
-        nextGhosts.push({
-          key: `${animation.id}-${cardId}-deal`,
-          card,
-          startRect,
-          endRect,
-          duration: moveCardDurationMs + 60,
-          zIndex: 400 + ghostIndex
-        });
-        nextHiddenCardIds.add(cardId);
-      });
 
       const nextHiddenFoundationSlots = new Set<number>();
       animation.completedRuns?.forEach((run) => {
@@ -316,7 +237,6 @@ export const Game: React.FC = () => {
 
       requestAnimationFrame(() => {
         setGhosts((current) => [...current, ...nextGhosts]);
-        setHiddenCardIds(nextHiddenCardIds);
         if (nextHiddenFoundationSlots.size > 0) {
           setHiddenFoundationSlots((current) => {
             const next = new Set(current);
@@ -334,11 +254,8 @@ export const Game: React.FC = () => {
   const handleGhostComplete = React.useCallback((finishedGhost: CardGhostAnimation) => {
     setGhosts((current) => {
       const nextGhosts = current.filter((ghost) => ghost.key !== finishedGhost.key);
-      if (nextGhosts.length === 0) {
-        setHiddenCardIds(new Set());
-      }
 
-       if (finishedGhost.foundationIndex !== undefined) {
+      if (finishedGhost.foundationIndex !== undefined) {
         const hasMoreForFoundation = nextGhosts.some(
           (ghost) => ghost.foundationIndex === finishedGhost.foundationIndex
         );
@@ -463,7 +380,6 @@ export const Game: React.FC = () => {
         selectedPileIndex={selectedPileIndex}
         selectedCardIndex={selectedCardIndex}
         hintSource={store.hintSource}
-        hiddenCardIds={hiddenCardIds}
         onCardClick={handleCardClick}
         onCardDoubleClick={handleCardDoubleClick}
         onEmptyPileClick={handleEmptyPileClick}
