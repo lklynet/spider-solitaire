@@ -40,6 +40,8 @@ const toRectSnapshot = (rect: DOMRect): RectSnapshot => ({
 const moveCardDurationMs = 240;
 const completeRunDurationMs = 700;
 const moveCardEasing = 'cubic-bezier(0.22, 1, 0.36, 1)';
+const autoMoveDoubleClickWindowMs = 420;
+const autoMoveChainDelayMs = 320;
 
 const AnimatedCardGhost: React.FC<{
   animation: CardGhostAnimation;
@@ -93,6 +95,13 @@ export const Game: React.FC = () => {
   const foundationSlotRefs = React.useRef<Array<HTMLDivElement | null>>([]);
   const previousRectsRef = React.useRef<Map<string, RectSnapshot>>(new Map());
   const lastAnimatedActionRef = React.useRef<number | null>(null);
+  const lastCardClickRef = React.useRef<{
+    pileIndex: number;
+    cardIndex: number;
+    timeStamp: number;
+  } | null>(null);
+  const queuedAutoMoveRef = React.useRef<{ pileIndex: number; cardIndex: number } | null>(null);
+  const autoMoveReleaseTimeoutRef = React.useRef<number | null>(null);
 
   useEffect(() => {
     if (!seed) {
@@ -127,6 +136,12 @@ export const Game: React.FC = () => {
       }
     };
   }, [gameWon, incrementTimer, isPlaying]);
+
+  useEffect(() => () => {
+    if (autoMoveReleaseTimeoutRef.current !== null) {
+      window.clearTimeout(autoMoveReleaseTimeoutRef.current);
+    }
+  }, []);
 
   useLayoutEffect(() => {
     const board = boardRef.current;
@@ -288,11 +303,56 @@ export const Game: React.FC = () => {
     callback();
   };
 
-  const handleCardClick = (pileIndex: number, cardIndex: number) => {
+  function triggerAutoMove(pileIndex: number, cardIndex: number) {
+    const moved = store.autoMoveCard(pileIndex, cardIndex);
+    if (!moved) return false;
+
+    clearSelection();
+
+    if (autoMoveReleaseTimeoutRef.current !== null) {
+      window.clearTimeout(autoMoveReleaseTimeoutRef.current);
+    }
+
+    autoMoveReleaseTimeoutRef.current = window.setTimeout(() => {
+      autoMoveReleaseTimeoutRef.current = null;
+      const queuedMove = queuedAutoMoveRef.current;
+      queuedAutoMoveRef.current = null;
+
+      if (queuedMove) {
+        triggerAutoMove(queuedMove.pileIndex, queuedMove.cardIndex);
+      }
+    }, autoMoveChainDelayMs);
+
+    return true;
+  }
+
+  const handleCardClick = (pileIndex: number, cardIndex: number, timeStamp: number) => {
     const pile = store.tableau[pileIndex];
     const card = pile.cards[cardIndex];
 
     if (!card.faceUp) return;
+
+    const lastClick = lastCardClickRef.current;
+    const isRepeatClick =
+      lastClick &&
+      lastClick.pileIndex === pileIndex &&
+      lastClick.cardIndex === cardIndex &&
+      timeStamp - lastClick.timeStamp <= autoMoveDoubleClickWindowMs;
+
+    if (isRepeatClick) {
+      lastCardClickRef.current = null;
+
+      if (autoMoveReleaseTimeoutRef.current !== null) {
+        queuedAutoMoveRef.current = { pileIndex, cardIndex };
+        clearSelection();
+        return;
+      }
+
+      triggerAutoMove(pileIndex, cardIndex);
+      return;
+    }
+
+    lastCardClickRef.current = { pileIndex, cardIndex, timeStamp };
 
     if (selectedPileIndex === null) {
       setSelectedPileIndex(pileIndex);
@@ -314,11 +374,6 @@ export const Game: React.FC = () => {
       store.moveCards(selectedPileIndex, pileIndex, selectedCardIndex!);
       clearSelection();
     }
-  };
-
-  const handleCardDoubleClick = (pileIndex: number, cardIndex: number) => {
-    store.autoMoveCard(pileIndex, cardIndex);
-    clearSelection();
   };
 
   const startPracticeGame = () => {
@@ -381,7 +436,6 @@ export const Game: React.FC = () => {
         selectedCardIndex={selectedCardIndex}
         hintSource={store.hintSource}
         onCardClick={handleCardClick}
-        onCardDoubleClick={handleCardDoubleClick}
         onEmptyPileClick={handleEmptyPileClick}
       />
       {ghosts.map((ghost) => (

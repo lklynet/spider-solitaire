@@ -8,8 +8,7 @@ interface TableauProps {
   selectedPileIndex: number | null;
   selectedCardIndex: number | null;
   hintSource?: { pileIndex: number, cardIndex: number };
-  onCardClick: (pileIndex: number, cardIndex: number) => void;
-  onCardDoubleClick?: (pileIndex: number, cardIndex: number) => void;
+  onCardClick: (pileIndex: number, cardIndex: number, timeStamp: number) => void;
   onEmptyPileClick: (pileIndex: number) => void;
 }
 
@@ -75,7 +74,6 @@ export const Tableau: React.FC<TableauProps> = ({
     selectedCardIndex, 
     hintSource,
     onCardClick, 
-    onCardDoubleClick,
     onEmptyPileClick 
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -139,7 +137,6 @@ export const Tableau: React.FC<TableauProps> = ({
                     isSelected={isSelected}
                     isHinted={isHinted}
                     onClick={onCardClick}
-                    onDoubleClick={onCardDoubleClick}
                     style={{ top: cardPositions[cardIndex] }}
                 />
              );

@@ -10,8 +10,7 @@ interface CardProps {
   pileIndex: number;
   isSelected: boolean;
   isHinted?: boolean;
-  onClick: (pileIndex: number, cardIndex: number) => void;
-  onDoubleClick?: (pileIndex: number, cardIndex: number) => void;
+  onClick: (pileIndex: number, cardIndex: number, timeStamp: number) => void;
   style?: React.CSSProperties;
 }
 
@@ -85,7 +84,6 @@ export const Card: React.FC<CardProps> = ({
   isSelected,
   isHinted,
   onClick,
-  onDoubleClick,
   style
 }) => {
   const { cardBack } = useGameStore();
@@ -101,11 +99,7 @@ export const Card: React.FC<CardProps> = ({
       }}
       onClick={(e: React.MouseEvent) => {
         e.stopPropagation();
-        if (e.detail >= 2) {
-          onDoubleClick?.(pileIndex, index);
-          return;
-        }
-        onClick(pileIndex, index);
+        onClick(pileIndex, index, e.timeStamp);
       }}
     >
       <CardVisual

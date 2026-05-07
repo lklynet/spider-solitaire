@@ -37,7 +37,7 @@ interface GameStore extends GameState {
   incrementTimer: () => void;
   restartGame: () => void;
   showHint: () => void;
-  autoMoveCard: (fromPileIndex: number, cardIndex: number) => void;
+  autoMoveCard: (fromPileIndex: number, cardIndex: number) => boolean;
   cardBack: number;
   setCardBack: (id: number) => void;
   colorScheme: string;
@@ -484,10 +484,10 @@ export const useGameStore = create<GameStore>()(
       autoMoveCard: (fromPileIndex, cardIndex) => {
         const { tableau } = get();
         const fromPile = tableau[fromPileIndex];
-        if (!fromPile || cardIndex >= fromPile.cards.length) return;
+        if (!fromPile || cardIndex >= fromPile.cards.length) return false;
 
         const cardsToMove = fromPile.cards.slice(cardIndex);
-        if (!isValidMoveGroup(cardsToMove)) return;
+        if (!isValidMoveGroup(cardsToMove)) return false;
 
         const movingCard = cardsToMove[0];
         let bestTargetIndex = -1;
@@ -530,9 +530,10 @@ export const useGameStore = create<GameStore>()(
           }
         }
 
-        if (bestTargetIndex !== -1) {
-          get().moveCards(fromPileIndex, bestTargetIndex, cardIndex);
-        }
+        if (bestTargetIndex === -1) return false;
+
+        get().moveCards(fromPileIndex, bestTargetIndex, cardIndex);
+        return true;
       }
     }),
     {
