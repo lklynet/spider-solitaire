@@ -180,31 +180,6 @@ export const Game: React.FC = () => {
 
     const previousRects = previousRectsRef.current;
 
-    cardElements.forEach((element) => {
-      const cardId = element.dataset.cardId;
-      if (!cardId) return;
-
-      const previousRect = previousRects.get(cardId);
-      const currentRect = currentRects.get(cardId);
-      if (!previousRect || !currentRect) return;
-
-      const deltaX = previousRect.left - currentRect.left;
-      const deltaY = previousRect.top - currentRect.top;
-
-      if (Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1) return;
-
-      element.animate(
-        [
-          { transform: `translate3d(${deltaX}px, ${deltaY}px, 0px)` },
-          { transform: 'translate3d(0px, 0px, 0px)' }
-        ],
-        {
-          duration: moveCardDurationMs,
-          easing: 'cubic-bezier(0.22, 1, 0.36, 1)'
-        }
-      );
-    });
-
     const animation = store.lastAnimation;
     if (animation && lastAnimatedActionRef.current !== animation.id) {
       const completedCardIds = new Set(
@@ -314,7 +289,7 @@ export const Game: React.FC = () => {
         });
       });
 
-      requestAnimationFrame(() => {
+      queueMicrotask(() => {
         setGhosts((current) => [...current, ...nextGhosts]);
         setHiddenCardIds(nextHiddenCardIds);
         if (nextHiddenFoundationSlots.size > 0) {

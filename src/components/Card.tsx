@@ -95,7 +95,7 @@ export const Card: React.FC<CardProps> = ({
   return (
     <div
       data-card-id={card.id}
-      className="absolute"
+      className="absolute transition-[top] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]"
       style={{
         top: card.faceUp ? index * 30 : index * 12,
         zIndex: index,

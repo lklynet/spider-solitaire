@@ -120,7 +120,7 @@ export const Tableau: React.FC<TableauProps> = ({
             key={pile.id} 
             data-pile-index={pileIndex}
             className={cn(
-                "relative min-h-[150px] w-24 flex-shrink-0 rounded-lg transition-colors",
+                "relative min-h-[150px] w-24 flex-shrink-0 rounded-lg transition-[height,colors] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]",
                 pile.cards.length === 0 && "bg-black/20 border-2 border-dashed border-primary/30"
             )}
             style={{
