@@ -322,17 +322,28 @@ export const Game: React.FC = () => {
       lastClick.pileIndex === pileIndex &&
       lastClick.cardIndex === cardIndex &&
       timeStamp - lastClick.timeStamp <= autoMoveDoubleClickWindowMs;
+    const isSelectedRunRepeatClick =
+      lastClick &&
+      selectedPileIndex === pileIndex &&
+      selectedCardIndex !== null &&
+      lastClick.pileIndex === pileIndex &&
+      lastClick.cardIndex === selectedCardIndex &&
+      cardIndex >= selectedCardIndex &&
+      timeStamp - lastClick.timeStamp <= autoMoveDoubleClickWindowMs;
 
-    if (isRepeatClick) {
+    if (isRepeatClick || isSelectedRunRepeatClick) {
       lastCardClickRef.current = null;
 
       if (autoMoveReleaseTimeoutRef.current !== null) {
-        queuedAutoMoveRef.current = { pileIndex, cardIndex };
+        queuedAutoMoveRef.current = {
+          pileIndex,
+          cardIndex: isSelectedRunRepeatClick ? selectedCardIndex : cardIndex
+        };
         clearSelection();
         return;
       }
 
-      triggerAutoMove(pileIndex, cardIndex);
+      triggerAutoMove(pileIndex, isSelectedRunRepeatClick ? selectedCardIndex : cardIndex);
       return;
     }
 
