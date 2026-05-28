@@ -20,6 +20,8 @@ const CARD_HEIGHT = 144;
 const PILE_BOTTOM_PADDING = 20;
 const DEFAULT_PILE_HEIGHT = 150;
 const VIEWPORT_BOTTOM_MARGIN = 32;
+const BASE_CARD_HOVER_LIFT = 4;
+const MAX_CARD_HOVER_LIFT = 22;
 
 const getCardPositions = (pile: TableauPile, availableHeight: number) => {
   const gapBudget = Math.max(0, availableHeight - CARD_HEIGHT - PILE_BOTTOM_PADDING);
@@ -64,8 +66,18 @@ const getCardPositions = (pile: TableauPile, availableHeight: number) => {
 
   return {
     cardPositions,
+    faceUpGap,
     totalHeight
   };
+};
+
+const getCardHoverLift = (card: TableauPile['cards'][number], faceUpGap: number) => {
+  if (!card.faceUp) {
+    return BASE_CARD_HOVER_LIFT;
+  }
+
+  const compression = Math.max(0, FACE_UP_GAP - faceUpGap);
+  return Math.min(MAX_CARD_HOVER_LIFT, BASE_CARD_HOVER_LIFT + compression * 1.5);
 };
 
 export const Tableau: React.FC<TableauProps> = ({ 
@@ -109,7 +121,7 @@ export const Tableau: React.FC<TableauProps> = ({
       className="mx-auto flex w-full max-w-[1128px] justify-center gap-4 overflow-x-auto px-2 pb-48"
     >
       {tableau.map((pile, pileIndex) => {
-        const { cardPositions, totalHeight } = pileLayouts[pileIndex];
+        const { cardPositions, faceUpGap, totalHeight } = pileLayouts[pileIndex];
 
         return (
         <div 
@@ -136,6 +148,7 @@ export const Tableau: React.FC<TableauProps> = ({
                     pileIndex={pileIndex}
                     isSelected={isSelected}
                     isHinted={isHinted}
+                    hoverLift={getCardHoverLift(card, faceUpGap)}
                     onClick={onCardClick}
                     style={{ top: cardPositions[cardIndex] }}
                 />

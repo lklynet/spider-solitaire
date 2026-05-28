@@ -10,6 +10,8 @@ import { useStatsStore } from './statsStore';
 
 interface StoredBoardSnapshot extends GameState {
   playMode: 'casual';
+  recordedGameStarted: boolean;
+  recordedGameWon: boolean;
 }
 
 interface CompletedRunAnimation {
@@ -44,10 +46,12 @@ interface GameStore extends GameState {
   setColorScheme: (scheme: string) => void;
   setShowWinModal: (show: boolean) => void;
   playMode: 'casual';
+  recordedGameStarted: boolean;
+  recordedGameWon: boolean;
   lastAnimation: UiAnimation | null;
 }
 
-const STORAGE_VERSION = 3;
+const STORAGE_VERSION = 4;
 
 const randomSeed = () => Math.random().toString(36).substring(7);
 
@@ -70,7 +74,9 @@ const createBaseSnapshot = (): StoredBoardSnapshot => ({
   hintSource: undefined,
   hintDeck: false,
   hintNewGame: false,
-  playMode: 'casual'
+  playMode: 'casual',
+  recordedGameStarted: false,
+  recordedGameWon: false
 });
 
 const cloneSnapshot = (snapshot: StoredBoardSnapshot): StoredBoardSnapshot =>
@@ -146,7 +152,26 @@ const createLegacySnapshot = (rawState: Record<string, unknown>): StoredBoardSna
         : undefined,
     hintDeck: Boolean(candidate.hintDeck),
     hintNewGame: Boolean(candidate.hintNewGame),
-    playMode: 'casual'
+    playMode: 'casual',
+    recordedGameStarted:
+      typeof candidate.recordedGameStarted === 'boolean'
+        ? candidate.recordedGameStarted
+        : Array.isArray(candidate.history) && candidate.history.length > 0,
+    recordedGameWon: Boolean(candidate.recordedGameWon)
+  };
+};
+
+const createHydratedSnapshot = (rawState: Record<string, unknown>): StoredBoardSnapshot => {
+  const migrated = createLegacySnapshot(rawState);
+
+  if (migrated.gameWon) {
+    return createSnapshot();
+  }
+
+  return {
+    ...migrated,
+    showWinModal: false,
+    isPaused: migrated.isPlaying ? true : migrated.isPaused
   };
 };
 
@@ -168,7 +193,7 @@ export const useGameStore = create<GameStore>()(
       },
 
       moveCards: (fromPileIndex, toPileIndex, cardIndex) => {
-        const { tableau, history, moves, score, foundation } = get();
+        const { tableau, history, moves, score, foundation, recordedGameStarted, recordedGameWon } = get();
         const fromPile = tableau[fromPileIndex];
         const toPile = tableau[toPileIndex];
         const cardsToMove = fromPile.cards.slice(cardIndex);
@@ -255,6 +280,8 @@ export const useGameStore = create<GameStore>()(
           showWinModal: gameWon,
           isPlaying: true,
           isPaused: false,
+          recordedGameStarted: true,
+          recordedGameWon: gameWon || recordedGameWon,
           lastAnimation: {
             id: Date.now() + Math.random(),
             movedCardIds: cardsToMove.map((card) => card.id),
@@ -262,11 +289,17 @@ export const useGameStore = create<GameStore>()(
           }
         });
 
+        if (!recordedGameStarted) {
+          useStatsStore.getState().recordGameStart();
+        }
+        if (gameWon && !recordedGameWon) {
+          useStatsStore.getState().recordWin(newScore, get().timer, moves + 1);
+        }
         useStatsStore.getState().recordMove();
       },
 
       dealFromStock: () => {
-        const { stock, tableau, history, foundation, score } = get();
+        const { stock, tableau, history, foundation, score, recordedGameStarted, recordedGameWon } = get();
         if (stock.length === 0) return;
 
         const newHistory = [
@@ -331,6 +364,8 @@ export const useGameStore = create<GameStore>()(
           showWinModal: gameWon,
           isPlaying: !gameWon,
           isPaused: false,
+          recordedGameStarted: true,
+          recordedGameWon: gameWon || recordedGameWon,
           lastAnimation: {
             id: Date.now() + Math.random(),
             dealtCardIds,
@@ -338,6 +373,12 @@ export const useGameStore = create<GameStore>()(
           }
         });
 
+        if (!recordedGameStarted) {
+          useStatsStore.getState().recordGameStart();
+        }
+        if (gameWon && !recordedGameWon) {
+          useStatsStore.getState().recordWin(newScore, get().timer, get().moves);
+        }
         useStatsStore.getState().recordDeal();
       },
 
@@ -541,12 +582,22 @@ export const useGameStore = create<GameStore>()(
       version: STORAGE_VERSION,
       migrate: (persistedState) => {
         const raw = (persistedState ?? {}) as Record<string, unknown>;
-        const migrated = createLegacySnapshot(raw);
 
         return {
-          ...migrated,
+          ...createHydratedSnapshot(raw),
           cardBack: typeof raw.cardBack === 'number' ? raw.cardBack : 1,
           colorScheme: typeof raw.colorScheme === 'string' ? raw.colorScheme : 'default'
+        };
+      },
+      merge: (persistedState, currentState) => {
+        const raw = (persistedState ?? {}) as Record<string, unknown>;
+
+        return {
+          ...currentState,
+          ...createHydratedSnapshot(raw),
+          cardBack: typeof raw.cardBack === 'number' ? raw.cardBack : currentState.cardBack,
+          colorScheme:
+            typeof raw.colorScheme === 'string' ? raw.colorScheme : currentState.colorScheme
         };
       },
       partialize: (state) => ({
@@ -566,6 +617,8 @@ export const useGameStore = create<GameStore>()(
         hintDeck: state.hintDeck,
         hintNewGame: state.hintNewGame,
         playMode: state.playMode,
+        recordedGameStarted: state.recordedGameStarted,
+        recordedGameWon: state.recordedGameWon,
         cardBack: state.cardBack,
         colorScheme: state.colorScheme
       })

@@ -80,8 +80,6 @@ const AnimatedCardGhost: React.FC<{
 export const Game: React.FC = () => {
   const store = useGameStore();
   const { seed, initializeGame, incrementTimer, isPlaying, gameWon } = store;
-  const recordGameStart = useStatsStore((state) => state.recordGameStart);
-  const recordWin = useStatsStore((state) => state.recordWin);
   const recordLoss = useStatsStore((state) => state.recordLoss);
   const [selectedPileIndex, setSelectedPileIndex] = useState<number | null>(null);
   const [selectedCardIndex, setSelectedCardIndex] = useState<number | null>(null);
@@ -89,7 +87,6 @@ export const Game: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [ghosts, setGhosts] = useState<CardGhostAnimation[]>([]);
   const [hiddenFoundationSlots, setHiddenFoundationSlots] = useState<Set<number>>(new Set());
-  const recordedSeedRef = React.useRef<string | null>(null);
   const boardRef = React.useRef<HTMLDivElement | null>(null);
   const stockRef = React.useRef<HTMLDivElement | null>(null);
   const foundationSlotRefs = React.useRef<Array<HTMLDivElement | null>>([]);
@@ -108,19 +105,6 @@ export const Game: React.FC = () => {
       initializeGame();
     }
   }, [initializeGame, seed]);
-
-  useEffect(() => {
-    if (store.history.length > 0 && recordedSeedRef.current !== store.seed) {
-      recordGameStart();
-      recordedSeedRef.current = store.seed;
-    }
-  }, [recordGameStart, store.history.length, store.seed]);
-
-  useEffect(() => {
-    if (!store.gameWon) return;
-
-    recordWin(store.score, store.timer, store.moves);
-  }, [recordWin, store.gameWon, store.moves, store.score, store.timer]);
 
   useEffect(() => {
     let interval: number | null = null;

@@ -10,6 +10,7 @@ interface CardProps {
   pileIndex: number;
   isSelected: boolean;
   isHinted?: boolean;
+  hoverLift: number;
   onClick: (pileIndex: number, cardIndex: number, timeStamp: number) => void;
   style?: React.CSSProperties;
 }
@@ -29,9 +30,14 @@ export const CardVisual: React.FC<{
   isSelected?: boolean;
   isHinted?: boolean;
   isHidden?: boolean;
+  hoverLift?: number;
   cardBack: number;
-}> = ({ card, isSelected = false, isHinted = false, isHidden = false, cardBack }) => {
+}> = ({ card, isSelected = false, isHinted = false, isHidden = false, hoverLift = 4, cardBack }) => {
   const isRed = card.suit === 'hearts' || card.suit === 'diamonds';
+  const cardStyle = {
+    '--card-raise': `${hoverLift}px`,
+    '--card-selected-raise': `${Math.max(8, hoverLift + 4)}px`
+  } as React.CSSProperties;
 
   if (!card.faceUp) {
     return (
@@ -51,10 +57,11 @@ export const CardVisual: React.FC<{
         "h-36 w-24 cursor-pointer select-none touch-none rounded-lg border-2 border-black bg-white transition-[transform,opacity] duration-150",
         "flex flex-col justify-between p-2",
         isHidden && "opacity-0",
-        isSelected ? "ring-4 ring-yellow-400 -translate-y-2 z-10 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]" : "shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1",
-        isHinted && !isSelected && "ring-4 ring-blue-400 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] -translate-y-1",
+        isSelected ? "ring-4 ring-yellow-400 translate-y-[calc(var(--card-selected-raise)*-1)] z-10 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]" : "shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[calc(var(--card-raise)*-1)]",
+        isHinted && !isSelected && "ring-4 ring-blue-400 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] translate-y-[calc(var(--card-raise)*-1)]",
         isRed ? "text-red-600" : "text-black"
       )}
+      style={cardStyle}
     >
       <div className="flex justify-between items-start">
         <div className="flex flex-col items-center leading-none">
@@ -83,6 +90,7 @@ export const Card: React.FC<CardProps> = ({
   pileIndex,
   isSelected,
   isHinted,
+  hoverLift,
   onClick,
   style
 }) => {
@@ -106,6 +114,7 @@ export const Card: React.FC<CardProps> = ({
         card={card}
         isSelected={isSelected}
         isHinted={isHinted}
+        hoverLift={hoverLift}
         cardBack={cardBack}
       />
     </div>
