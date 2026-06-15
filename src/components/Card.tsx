@@ -1,8 +1,8 @@
-import React from 'react';
-import type { Card as CardType } from '../types/game';
-import { useGameStore } from '../store/gameStore';
-import { cn, getRankString } from '../lib/utils';
-import { Heart, Diamond, Club, Spade } from 'lucide-react';
+import React from "react";
+import type { Card as CardType } from "../types/game";
+import { useGameStore } from "../store/gameStore";
+import { cn, getRankString } from "../lib/utils";
+import { Heart, Diamond, Club, Spade } from "lucide-react";
 
 interface CardProps {
   card: CardType;
@@ -15,13 +15,24 @@ interface CardProps {
   style?: React.CSSProperties;
 }
 
-const SuitIcon = ({ suit, className }: { suit: string; className?: string }) => {
+const SuitIcon = ({
+  suit,
+  className,
+}: {
+  suit: string;
+  className?: string;
+}) => {
   switch (suit) {
-    case 'hearts': return <Heart className={cn("fill-current", className)} />;
-    case 'diamonds': return <Diamond className={cn("fill-current", className)} />;
-    case 'clubs': return <Club className={cn("fill-current", className)} />;
-    case 'spades': return <Spade className={cn("fill-current", className)} />;
-    default: return null;
+    case "hearts":
+      return <Heart className={cn("fill-current", className)} />;
+    case "diamonds":
+      return <Diamond className={cn("fill-current", className)} />;
+    case "clubs":
+      return <Club className={cn("fill-current", className)} />;
+    case "spades":
+      return <Spade className={cn("fill-current", className)} />;
+    default:
+      return null;
   }
 };
 
@@ -32,11 +43,18 @@ export const CardVisual: React.FC<{
   isHidden?: boolean;
   hoverLift?: number;
   cardBack: number;
-}> = ({ card, isSelected = false, isHinted = false, isHidden = false, hoverLift = 4, cardBack }) => {
-  const isRed = card.suit === 'hearts' || card.suit === 'diamonds';
+}> = ({
+  card,
+  isSelected = false,
+  isHinted = false,
+  isHidden = false,
+  hoverLift = 4,
+  cardBack,
+}) => {
+  const isRed = card.suit === "hearts" || card.suit === "diamonds";
   const cardStyle = {
-    '--card-raise': `${hoverLift}px`,
-    '--card-selected-raise': `${Math.max(8, hoverLift + 4)}px`
+    "--card-raise": `${hoverLift}px`,
+    "--card-selected-raise": `${hoverLift}px`,
   } as React.CSSProperties;
 
   if (!card.faceUp) {
@@ -45,7 +63,7 @@ export const CardVisual: React.FC<{
         className={cn(
           "h-36 w-24 rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-opacity duration-150",
           isHidden && "opacity-0",
-          `card-back-${cardBack}`
+          `card-back-${cardBack}`,
         )}
       />
     );
@@ -57,9 +75,13 @@ export const CardVisual: React.FC<{
         "h-36 w-24 cursor-pointer select-none touch-none rounded-lg border-2 border-black bg-white transition-[transform,opacity] duration-150",
         "flex flex-col justify-between p-2",
         isHidden && "opacity-0",
-        isSelected ? "ring-4 ring-yellow-400 translate-y-[calc(var(--card-selected-raise)*-1)] z-10 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]" : "shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[calc(var(--card-raise)*-1)]",
-        isHinted && !isSelected && "ring-4 ring-blue-400 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] translate-y-[calc(var(--card-raise)*-1)]",
-        isRed ? "text-red-600" : "text-black"
+        isSelected
+          ? "ring-4 ring-yellow-400 translate-y-[calc(var(--card-selected-raise)*-1)] z-10 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]"
+          : "shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[calc(var(--card-raise)*-1)]",
+        isHinted &&
+          !isSelected &&
+          "ring-4 ring-blue-400 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] translate-y-[calc(var(--card-raise)*-1)]",
+        isRed ? "text-red-600" : "text-black",
       )}
       style={cardStyle}
     >
@@ -71,7 +93,7 @@ export const CardVisual: React.FC<{
       </div>
 
       <div className="absolute inset-0 flex justify-center items-center pointer-events-none opacity-20">
-         <SuitIcon suit={card.suit} className="h-16 w-16" />
+        <SuitIcon suit={card.suit} className="h-16 w-16" />
       </div>
 
       <div className="flex justify-between items-end rotate-180">
@@ -92,7 +114,7 @@ export const Card: React.FC<CardProps> = ({
   isHinted,
   hoverLift,
   onClick,
-  style
+  style,
 }) => {
   const { cardBack } = useGameStore();
 
@@ -103,7 +125,7 @@ export const Card: React.FC<CardProps> = ({
       style={{
         top: card.faceUp ? index * 30 : index * 12,
         zIndex: index,
-        ...style
+        ...style,
       }}
       onClick={(e: React.MouseEvent) => {
         e.stopPropagation();
