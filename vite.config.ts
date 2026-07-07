@@ -6,8 +6,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@spider/shared-types': fileURLToPath(new URL('./packages/shared-types/src', import.meta.url)),
-      '@spider/game-engine': fileURLToPath(new URL('./packages/game-engine/src', import.meta.url))
+      '@': fileURLToPath(new URL('./src', import.meta.url))
     }
   }
 });

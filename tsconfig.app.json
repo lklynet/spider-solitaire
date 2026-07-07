@@ -15,5 +15,5 @@
     "erasableSyntaxOnly": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src", "packages"]
+  "include": ["src"]
 }

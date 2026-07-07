@@ -2,10 +2,7 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@spider/shared-types": ["packages/shared-types/src/index.ts"],
-      "@spider/shared-types/*": ["packages/shared-types/src/*"],
-      "@spider/game-engine": ["packages/game-engine/src/index.ts"],
-      "@spider/game-engine/*": ["packages/game-engine/src/*"]
+      "@/*": ["src/*"]
     },
     "target": "ES2022",
     "skipLibCheck": true,

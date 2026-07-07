@@ -1,13 +1,12 @@
 :root {
-    /* Default Blue Theme */
     --pattern-color-1: 205 80% 50%;
     --pattern-color-2: 176 80% 50%;
     --pattern-bg: 240 19% 91%;
-
-    /* Blue UI Variables (overrides index.css) */
     --background: 205 60% 25%;
+    --foreground: 48 96% 89%;
     --popover: 205 60% 15%;
     --primary: 48 96% 53%;
+    --primary-foreground: 145 63% 15%;
     --border: 48 96% 53%;
 }
 
@@ -15,51 +14,38 @@
     --pattern-color-1: 350 80% 50%;
     --pattern-color-2: 15 80% 60%;
     --pattern-bg: 350 20% 95%;
-    
     --background: 350 60% 25%;
     --popover: 350 60% 15%;
-    --primary: 48 96% 53%;
-    --border: 48 96% 53%;
 }
 
 .theme-green {
     --pattern-color-1: 145 80% 35%;
     --pattern-color-2: 85 70% 45%;
     --pattern-bg: 120 20% 95%;
-    
     --background: 145 63% 25%;
     --popover: 145 63% 20%;
-    --primary: 48 96% 53%;
-    --border: 48 96% 53%;
 }
 
 .theme-purple {
     --pattern-color-1: 270 70% 50%;
     --pattern-color-2: 310 70% 50%;
     --pattern-bg: 270 20% 95%;
-    
     --background: 270 60% 25%;
     --popover: 270 60% 15%;
-    --primary: 48 96% 53%;
-    --border: 48 96% 53%;
 }
 
 .theme-orange {
     --pattern-color-1: 25 90% 50%;
     --pattern-color-2: 45 90% 50%;
     --pattern-bg: 30 20% 95%;
-    
     --background: 25 60% 25%;
     --popover: 25 60% 15%;
-    --primary: 48 96% 53%;
-    --border: 48 96% 53%;
 }
 
 .theme-dark {
     --pattern-color-1: 205 80% 60%;
     --pattern-color-2: 176 80% 60%;
     --pattern-bg: 220 20% 15%;
-    
     --background: 220 20% 10%;
     --popover: 220 20% 5%;
     --foreground: 220 20% 95%;

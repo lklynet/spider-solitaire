@@ -1,19 +1,19 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { TableauPile } from '../types/game';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { Card as CardType } from '@/engine/types';
 import { Card } from './Card';
-import { cn } from '../lib/utils';
+
+const FACE_UP_GAP = 30;
+const FACE_DOWN_GAP = 12;
 
 interface TableauProps {
-  tableau: TableauPile[];
+  tableau: CardType[][];
   selectedPileIndex: number | null;
   selectedCardIndex: number | null;
-  hintSource?: { pileIndex: number, cardIndex: number };
+  hintSource?: { pileIndex: number; cardIndex: number };
   onCardClick: (pileIndex: number, cardIndex: number, timeStamp: number) => void;
   onEmptyPileClick: (pileIndex: number) => void;
 }
 
-const FACE_UP_GAP = 30;
-const FACE_DOWN_GAP = 12;
 const MIN_FACE_UP_GAP = 18;
 const MIN_FACE_DOWN_GAP = 8;
 const CARD_HEIGHT = 144;
@@ -23,16 +23,14 @@ const VIEWPORT_BOTTOM_MARGIN = 32;
 const BASE_CARD_HOVER_LIFT = 4;
 const MAX_CARD_HOVER_LIFT = 22;
 
-const getCardPositions = (pile: TableauPile, availableHeight: number) => {
+const getCardPositions = (pile: CardType[], availableHeight: number) => {
   const gapBudget = Math.max(0, availableHeight - CARD_HEIGHT - PILE_BOTTOM_PADDING);
-  const faceUpCount = pile.cards.filter((card) => card.faceUp).length;
-  const faceDownCount = pile.cards.length - faceUpCount;
+  const faceUpCount = pile.filter((card) => card.faceUp).length;
+  const faceDownCount = pile.length - faceUpCount;
   const baseGapTotal =
-    Math.max(0, faceUpCount - 1) * FACE_UP_GAP +
-    Math.max(0, faceDownCount) * FACE_DOWN_GAP;
+    Math.max(0, faceUpCount - 1) * FACE_UP_GAP + Math.max(0, faceDownCount) * FACE_DOWN_GAP;
   const minGapTotal =
-    Math.max(0, faceUpCount - 1) * MIN_FACE_UP_GAP +
-    Math.max(0, faceDownCount) * MIN_FACE_DOWN_GAP;
+    Math.max(0, faceUpCount - 1) * MIN_FACE_UP_GAP + Math.max(0, faceDownCount) * MIN_FACE_DOWN_GAP;
 
   let faceUpGap = FACE_UP_GAP;
   let faceDownGap = FACE_DOWN_GAP;
@@ -51,63 +49,47 @@ const getCardPositions = (pile: TableauPile, availableHeight: number) => {
   }
 
   let currentTop = 0;
-  const cardPositions = pile.cards.map((card, index) => {
+  const cardPositions = pile.map((card, index) => {
     const pos = currentTop;
-    if (index < pile.cards.length - 1) {
+    if (index < pile.length - 1) {
       currentTop += card.faceUp ? faceUpGap : faceDownGap;
     }
     return pos;
   });
 
   const totalHeight =
-    pile.cards.length > 0
-      ? cardPositions[pile.cards.length - 1] + CARD_HEIGHT + PILE_BOTTOM_PADDING
-      : DEFAULT_PILE_HEIGHT;
+    pile.length > 0 ? cardPositions[pile.length - 1] + CARD_HEIGHT + PILE_BOTTOM_PADDING : DEFAULT_PILE_HEIGHT;
 
-  return {
-    cardPositions,
-    faceUpGap,
-    totalHeight
-  };
+  return { cardPositions, faceUpGap, totalHeight };
 };
 
-const getCardHoverLift = (card: TableauPile['cards'][number], faceUpGap: number) => {
-  if (!card.faceUp) {
-    return BASE_CARD_HOVER_LIFT;
-  }
-
+const getCardHoverLift = (card: CardType, faceUpGap: number) => {
+  if (!card.faceUp) return BASE_CARD_HOVER_LIFT;
   const compression = Math.max(0, FACE_UP_GAP - faceUpGap);
   return Math.min(MAX_CARD_HOVER_LIFT, BASE_CARD_HOVER_LIFT + compression * 1.5);
 };
 
-export const Tableau: React.FC<TableauProps> = ({ 
-    tableau, 
-    selectedPileIndex, 
-    selectedCardIndex, 
-    hintSource,
-    onCardClick, 
-    onEmptyPileClick 
-}) => {
+export function Tableau({
+  tableau,
+  selectedPileIndex,
+  selectedCardIndex,
+  hintSource,
+  onCardClick,
+  onEmptyPileClick
+}: TableauProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [availablePileHeight, setAvailablePileHeight] = useState(720);
 
   useEffect(() => {
     const updateAvailableHeight = () => {
       const top = containerRef.current?.getBoundingClientRect().top ?? 0;
-      const viewportHeight = window.innerHeight;
-      const nextHeight = Math.max(
-        DEFAULT_PILE_HEIGHT,
-        viewportHeight - top - VIEWPORT_BOTTOM_MARGIN
-      );
+      const nextHeight = Math.max(DEFAULT_PILE_HEIGHT, window.innerHeight - top - VIEWPORT_BOTTOM_MARGIN);
       setAvailablePileHeight(nextHeight);
     };
 
     updateAvailableHeight();
     window.addEventListener('resize', updateAvailableHeight);
-
-    return () => {
-      window.removeEventListener('resize', updateAvailableHeight);
-    };
+    return () => window.removeEventListener('resize', updateAvailableHeight);
   }, []);
 
   const pileLayouts = useMemo(
@@ -116,46 +98,44 @@ export const Tableau: React.FC<TableauProps> = ({
   );
 
   return (
-    <div
-      ref={containerRef}
-      className="mx-auto flex w-full max-w-[1128px] justify-center gap-4 overflow-x-auto px-2 pb-48"
-    >
+    <div ref={containerRef} className="tableau">
       {tableau.map((pile, pileIndex) => {
         const { cardPositions, faceUpGap, totalHeight } = pileLayouts[pileIndex];
+        const pileClass = pile.length === 0 ? 'tableau__pile tableau__pile--empty' : 'tableau__pile';
 
         return (
-        <div 
-            key={pile.id} 
+          <div
+            key={pileIndex}
             data-pile-index={pileIndex}
-            className={cn(
-                "relative min-h-[150px] w-24 flex-shrink-0 rounded-lg transition-[height,colors] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]",
-                pile.cards.length === 0 && "bg-black/20 border-2 border-dashed border-primary/30"
-            )}
-            style={{
-                height: `${totalHeight}px`
-            }}
+            className={pileClass}
+            style={{ height: `${totalHeight}px` }}
             onClick={() => onEmptyPileClick(pileIndex)}
-        >
-          {pile.cards.map((card, cardIndex) => {
-             const isSelected = selectedPileIndex === pileIndex && selectedCardIndex !== null && cardIndex >= selectedCardIndex;
-             const isHinted = hintSource?.pileIndex === pileIndex && cardIndex >= hintSource.cardIndex;
-             
-             return (
+          >
+            {pile.map((card, cardIndex) => {
+              const isSelected =
+                selectedPileIndex === pileIndex &&
+                selectedCardIndex !== null &&
+                cardIndex >= selectedCardIndex;
+              const isHinted =
+                hintSource?.pileIndex === pileIndex && cardIndex >= hintSource.cardIndex;
+
+              return (
                 <Card
-                    key={card.id}
-                    card={card}
-                    index={cardIndex}
-                    pileIndex={pileIndex}
-                    isSelected={isSelected}
-                    isHinted={isHinted}
-                    hoverLift={getCardHoverLift(card, faceUpGap)}
-                    onClick={onCardClick}
-                    style={{ top: cardPositions[cardIndex] }}
+                  key={card.id}
+                  card={card}
+                  index={cardIndex}
+                  pileIndex={pileIndex}
+                  isSelected={isSelected}
+                  isHinted={isHinted}
+                  hoverLift={getCardHoverLift(card, faceUpGap)}
+                  top={cardPositions[cardIndex]}
+                  onClick={onCardClick}
                 />
-             );
-          })}
-        </div>
-      )})}
+              );
+            })}
+          </div>
+        );
+      })}
     </div>
   );
 };

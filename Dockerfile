@@ -2,9 +2,7 @@ FROM node:20-alpine AS build
 
 WORKDIR /app
 
-COPY package.json package-lock.json tsconfig.json tsconfig.base.json ./
-COPY packages/shared-types/package.json ./packages/shared-types/package.json
-COPY packages/game-engine/package.json ./packages/game-engine/package.json
+COPY package.json package-lock.json tsconfig.json tsconfig.base.json tsconfig.app.json tsconfig.node.json ./
 
 RUN npm ci
 

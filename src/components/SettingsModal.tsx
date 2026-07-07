@@ -1,87 +1,67 @@
-import React from 'react';
-import { useGameStore } from '../store/gameStore';
-import { X } from 'lucide-react';
+import { CARD_BACK_COUNT, useGameStore } from '../store/gameStore';
+
+export const COLOR_THEMES = [
+  { id: 'default', label: 'Classic Blue' },
+  { id: 'red', label: 'Red' },
+  { id: 'green', label: 'Green' },
+  { id: 'purple', label: 'Purple' },
+  { id: 'orange', label: 'Orange' },
+  { id: 'dark', label: 'Dark Mode' }
+] as const;
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
+export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const { cardBack, setCardBack, colorScheme, setColorScheme } = useGameStore();
-  const cardDesignIds = Array.from({ length: 15 }, (_, i) => i + 1);
-
-  const themes = [
-    { id: 'default', label: 'Classic Blue' },
-    { id: 'red', label: 'Red' },
-    { id: 'green', label: 'Green' },
-    { id: 'purple', label: 'Purple' },
-    { id: 'orange', label: 'Orange' },
-    { id: 'dark', label: 'Dark Mode' },
-  ];
-
-  React.useEffect(() => {
-    if (cardBack > 15) {
-      setCardBack(15);
-    }
-  }, [cardBack, setCardBack]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-popover w-full max-w-4xl p-8 border-4 border-primary shadow-[8px_8px_0px_0px_rgba(0,0,0,0.4)] rounded-xl relative text-primary max-h-[90vh] overflow-y-auto">
-        <button 
-            onClick={onClose}
-            className="absolute top-6 right-6 p-3 z-10 flex items-center justify-center hover:bg-primary/20 rounded-full border-2 border-transparent hover:border-primary transition-all text-primary"
-        >
-            <X className="w-6 h-6" />
+    <div className="modal-overlay">
+      <div className="modal modal--wide">
+        <button type="button" onClick={onClose} className="modal__close">
+          Close
         </button>
 
-        <h2 className="text-4xl font-black mb-6 text-center uppercase tracking-tighter drop-shadow-md">Color Theme</h2>
-        <div className="mb-12 grid grid-cols-6 gap-4">
-            {themes.map((theme) => (
-                <button
-                    key={theme.id}
-                    onClick={() => setColorScheme(theme.id)}
-                    className={`
-                        min-w-0 px-3 py-3 rounded-xl border-4 font-bold uppercase tracking-[0.12em] transition-all
-                        ${colorScheme === theme.id
-                            ? 'border-primary bg-primary text-primary-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] translate-y-[-2px]'
-                            : 'border-primary/20 bg-background text-primary/60 hover:border-primary hover:text-primary hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,0.2)]'
-                        }
-                    `}
-                >
-                    {theme.label}
-                </button>
-            ))}
+        <h2 className="modal__title modal__title--center">Color Theme</h2>
+        <div className="picker picker--themes">
+          {COLOR_THEMES.map((theme) => (
+            <button
+              key={theme.id}
+              type="button"
+              onClick={() => setColorScheme(theme.id)}
+              className={
+                colorScheme === theme.id ? 'picker__option picker__option--active' : 'picker__option'
+              }
+            >
+              {theme.label}
+            </button>
+          ))}
         </div>
 
-        <h2 className="text-4xl font-black mb-8 text-center uppercase tracking-tighter drop-shadow-md">Card Designs</h2>
+        <h2 className="modal__title modal__title--center">Card Designs</h2>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-            {cardDesignIds.map((id) => (
-                <button
-                    key={id}
-                    onClick={() => setCardBack(id)}
-                    className={`
-                        relative w-full aspect-[2.5/3.5] rounded-lg border-2 transition-all overflow-hidden
-                        ${cardBack === id 
-                            ? 'border-primary ring-4 ring-primary/30 scale-105 shadow-xl' 
-                            : 'border-primary/20 hover:border-primary/60 hover:scale-105'
-                        }
-                    `}
-                >
-                    <div className={`w-full h-full card-back-${id}`} />
-                    {cardBack === id && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-primary/20 font-bold text-white drop-shadow-md">
-                            SELECTED
-                        </div>
-                    )}
-                </button>
-            ))}
+        <div className="picker picker--cards">
+          {Array.from({ length: CARD_BACK_COUNT }, (_, index) => index + 1).map((id) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setCardBack(id)}
+              className={
+                cardBack === id
+                  ? 'picker__option picker__option--card picker__option--active'
+                  : 'picker__option picker__option--card'
+              }
+            >
+              <div className={`picker__preview card-back-${id}`} />
+              {cardBack === id && <div className="picker__selected">SELECTED</div>}
+            </button>
+          ))}
         </div>
       </div>
     </div>
   );
-};
+}

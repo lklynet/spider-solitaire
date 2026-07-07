@@ -1,626 +1,293 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Card, GameState, TableauPile } from '../types/game';
-import {
-  checkCompletedRun,
-  createInitialGameLayout,
-  isValidMoveGroup
-} from '@spider/game-engine';
-import { useStatsStore } from './statsStore';
+import { createBoardState } from '@/engine/deck';
+import { applyDealEvent, applyMoveEvent, applyUndoEvent } from '@/engine/replay';
+import { pickAutoMoveTarget } from '@/engine/moves';
+import type { BoardState, Card, GameHistory } from '@/engine/types';
 
-interface StoredBoardSnapshot extends GameState {
-  playMode: 'casual';
-  recordedGameStarted: boolean;
-  recordedGameWon: boolean;
+export interface LastWinSummary {
+  score: number;
+  time: number;
+  moves: number;
+  previousBestTime: number | null;
+  previousLeastMoves: number | null;
 }
 
-interface CompletedRunAnimation {
-  cards: Card[];
-  pileIndex: number;
-  foundationIndex: number;
-  topOffsets: number[];
+export const CARD_BACK_COUNT = 3;
+
+const STORAGE_VERSION = 8;
+
+const randomSeed = () => Math.random().toString(36).substring(7);
+
+const normalizeTableau = (raw: unknown): Card[][] => {
+  if (!Array.isArray(raw)) return Array.from({ length: 10 }, () => []);
+  return raw.map((pile) => (Array.isArray(pile) ? structuredClone(pile as Card[]) : []));
+};
+
+interface GameSnapshot extends BoardState {
+  timer: number;
+  playingSince: number | null;
+  isPlaying: boolean;
+  isPaused: boolean;
+  seed: string;
+  cardBack: number;
+  colorScheme: string;
+  gamesPlayed: number;
+  gamesWon: number;
+  currentStreak: number;
+  bestStreak: number;
+  bestScore: number;
+  bestTime: number | null;
+  leastMoves: number | null;
+  lastWinSummary: LastWinSummary | null;
 }
 
-interface UiAnimation {
-  id: number;
-  movedCardIds?: string[];
-  dealtCardIds?: string[];
-  completedRuns?: CompletedRunAnimation[];
-}
-
-interface GameStore extends GameState {
+interface GameStore extends GameSnapshot {
+  getTimer: () => number;
   initializeGame: (seed?: string) => void;
   moveCards: (fromPileIndex: number, toPileIndex: number, cardIndex: number) => void;
   dealFromStock: () => void;
   undo: () => void;
-  canUndo: () => boolean;
-  toggleTimer: () => void;
   togglePause: () => void;
-  incrementTimer: () => void;
   restartGame: () => void;
-  showHint: () => void;
   autoMoveCard: (fromPileIndex: number, cardIndex: number) => boolean;
-  cardBack: number;
   setCardBack: (id: number) => void;
-  colorScheme: string;
   setColorScheme: (scheme: string) => void;
-  setShowWinModal: (show: boolean) => void;
-  playMode: 'casual';
-  recordedGameStarted: boolean;
-  recordedGameWon: boolean;
-  lastAnimation: UiAnimation | null;
+  recordLoss: () => void;
 }
 
-const STORAGE_VERSION = 4;
-
-const randomSeed = () => Math.random().toString(36).substring(7);
-
-const createEmptyTableau = (): TableauPile[] =>
-  Array.from({ length: 10 }, (_, id) => ({ id, cards: [] }));
-
-const createBaseSnapshot = (): StoredBoardSnapshot => ({
-  tableau: createEmptyTableau(),
-  stock: [],
-  foundation: [],
-  moves: 0,
-  score: 500,
+const uiDefaults = (): Omit<GameSnapshot, keyof BoardState | 'seed'> => ({
   timer: 0,
+  playingSince: null,
   isPlaying: false,
   isPaused: false,
-  gameWon: false,
-  showWinModal: false,
-  seed: '',
-  history: [],
-  hintSource: undefined,
-  hintDeck: false,
-  hintNewGame: false,
-  playMode: 'casual',
-  recordedGameStarted: false,
-  recordedGameWon: false
+  cardBack: 1,
+  colorScheme: 'default',
+  gamesPlayed: 0,
+  gamesWon: 0,
+  currentStreak: 0,
+  bestStreak: 0,
+  bestScore: 0,
+  bestTime: null,
+  leastMoves: null,
+  lastWinSummary: null
 });
 
-const cloneSnapshot = (snapshot: StoredBoardSnapshot): StoredBoardSnapshot =>
-  JSON.parse(JSON.stringify(snapshot)) as StoredBoardSnapshot;
+const newGameSnapshot = (seed = randomSeed()): GameSnapshot => ({
+  ...createBoardState(seed),
+  ...uiDefaults(),
+  seed
+});
 
-const getCardTopOffsets = (cards: Card[]): number[] => {
-  let currentTop = 0;
-
-  return cards.map((card) => {
-    const top = currentTop;
-    currentTop += card.faceUp ? 30 : 12;
-    return top;
-  });
+const elapsedSeconds = (state: GameSnapshot) => {
+  if (state.playingSince && state.isPlaying && !state.isPaused && !state.gameWon) {
+    return state.timer + Math.floor((Date.now() - state.playingSince) / 1000);
+  }
+  return state.timer;
 };
 
-const createCompletedRunAnimation = (
-  cards: Card[],
-  pileIndex: number,
-  foundationIndex: number
-): CompletedRunAnimation => {
-  const topOffsets = getCardTopOffsets(cards);
-
+const freezeTimer = (state: GameSnapshot): Pick<GameSnapshot, 'timer' | 'playingSince'> => {
+  if (!state.playingSince) return { timer: state.timer, playingSince: null };
   return {
-    cards: JSON.parse(JSON.stringify(cards)),
-    pileIndex,
-    foundationIndex,
-    topOffsets
+    timer: state.timer + Math.floor((Date.now() - state.playingSince) / 1000),
+    playingSince: null
   };
 };
 
-const createSnapshot = (seed = randomSeed()): StoredBoardSnapshot => {
-  const { tableau, stock } = createInitialGameLayout(seed);
-
-  return {
-    ...createBaseSnapshot(),
-    tableau,
-    stock,
-    seed
-  };
-};
-
-const createLegacySnapshot = (rawState: Record<string, unknown>): StoredBoardSnapshot => {
-  const candidate =
-    rawState.practiceBoard && typeof rawState.practiceBoard === 'object'
-      ? (rawState.practiceBoard as Record<string, unknown>)
-      : rawState;
-
-  if (
-    !Array.isArray(candidate.tableau) ||
-    !Array.isArray(candidate.stock) ||
-    typeof candidate.seed !== 'string'
-  ) {
-    return createSnapshot();
+const loadSavedState = (raw: Record<string, unknown>): GameSnapshot => {
+  if (!Array.isArray(raw.tableau) || !Array.isArray(raw.stock) || typeof raw.seed !== 'string') {
+    return newGameSnapshot();
   }
 
-  return {
-    ...createBaseSnapshot(),
-    tableau: JSON.parse(JSON.stringify(candidate.tableau)),
-    stock: JSON.parse(JSON.stringify(candidate.stock)),
-    foundation: Array.isArray(candidate.foundation) ? [...candidate.foundation] : [],
-    moves: typeof candidate.moves === 'number' ? candidate.moves : 0,
-    score: typeof candidate.score === 'number' ? candidate.score : 500,
-    timer: typeof candidate.timer === 'number' ? candidate.timer : 0,
-    isPlaying: Boolean(candidate.isPlaying),
-    isPaused: Boolean(candidate.isPaused),
-    gameWon: Boolean(candidate.gameWon),
-    showWinModal: Boolean(candidate.showWinModal),
-    seed: candidate.seed,
-    history: Array.isArray(candidate.history) ? JSON.parse(JSON.stringify(candidate.history)) : [],
-    hintSource:
-      candidate.hintSource && typeof candidate.hintSource === 'object'
-        ? JSON.parse(JSON.stringify(candidate.hintSource))
-        : undefined,
-    hintDeck: Boolean(candidate.hintDeck),
-    hintNewGame: Boolean(candidate.hintNewGame),
-    playMode: 'casual',
-    recordedGameStarted:
-      typeof candidate.recordedGameStarted === 'boolean'
-        ? candidate.recordedGameStarted
-        : Array.isArray(candidate.history) && candidate.history.length > 0,
-    recordedGameWon: Boolean(candidate.recordedGameWon)
-  };
-};
-
-const createHydratedSnapshot = (rawState: Record<string, unknown>): StoredBoardSnapshot => {
-  const migrated = createLegacySnapshot(rawState);
-
-  if (migrated.gameWon) {
-    return createSnapshot();
+  if (raw.gameWon) {
+    return newGameSnapshot();
   }
 
-  return {
-    ...migrated,
-    showWinModal: false,
-    isPaused: migrated.isPlaying ? true : migrated.isPaused
+  const cardBack =
+    typeof raw.cardBack === 'number' ? Math.min(Math.max(raw.cardBack, 1), CARD_BACK_COUNT) : 1;
+
+  const loaded: GameSnapshot = {
+    ...newGameSnapshot(raw.seed),
+    tableau: normalizeTableau(raw.tableau),
+    stock: structuredClone(raw.stock as Card[]),
+    foundation: typeof raw.foundation === 'number' ? raw.foundation : 0,
+    moves: typeof raw.moves === 'number' ? raw.moves : 0,
+    score: typeof raw.score === 'number' ? raw.score : 500,
+    timer: typeof raw.timer === 'number' ? raw.timer : 0,
+    playingSince: null,
+    isPlaying: Boolean(raw.isPlaying),
+    isPaused: raw.isPlaying ? true : Boolean(raw.isPaused),
+    cardBack,
+    colorScheme: typeof raw.colorScheme === 'string' ? raw.colorScheme : 'default',
+    history: Array.isArray(raw.history) ? structuredClone(raw.history as GameHistory[]) : [],
+    gamesPlayed: typeof raw.gamesPlayed === 'number' ? raw.gamesPlayed : 0,
+    gamesWon: typeof raw.gamesWon === 'number' ? raw.gamesWon : 0,
+    currentStreak: typeof raw.currentStreak === 'number' ? raw.currentStreak : 0,
+    bestStreak: typeof raw.bestStreak === 'number' ? raw.bestStreak : 0,
+    bestScore: typeof raw.bestScore === 'number' ? raw.bestScore : 0,
+    bestTime: typeof raw.bestTime === 'number' ? raw.bestTime : null,
+    leastMoves: typeof raw.leastMoves === 'number' ? raw.leastMoves : null,
+    lastWinSummary:
+      raw.lastWinSummary && typeof raw.lastWinSummary === 'object'
+        ? structuredClone(raw.lastWinSummary as LastWinSummary)
+        : null
   };
+
+  if (loaded.isPlaying && !loaded.isPaused) {
+    loaded.playingSince = Date.now();
+  }
+
+  return loaded;
 };
 
-const initialSnapshot = createSnapshot();
+const recordGameStart = (state: GameSnapshot): Partial<GameSnapshot> => ({
+  gamesPlayed: state.gamesPlayed + 1,
+  playingSince: state.playingSince ?? Date.now()
+});
+
+const recordWin = (state: GameSnapshot, score: number, time: number, moves: number): Partial<GameSnapshot> => {
+  const nextStreak = state.currentStreak + 1;
+  return {
+    gamesWon: state.gamesWon + 1,
+    currentStreak: nextStreak,
+    bestStreak: Math.max(state.bestStreak, nextStreak),
+    bestScore: Math.max(state.bestScore, score),
+    bestTime: state.bestTime === null ? time : Math.min(state.bestTime, time),
+    leastMoves: state.leastMoves === null ? moves : Math.min(state.leastMoves, moves),
+    lastWinSummary: {
+      score,
+      time,
+      moves,
+      previousBestTime: state.bestTime,
+      previousLeastMoves: state.leastMoves
+    }
+  };
+};
 
 export const useGameStore = create<GameStore>()(
   persist(
     (set, get) => ({
-      ...cloneSnapshot(initialSnapshot),
-      cardBack: 1,
-      setCardBack: (id) => set({ cardBack: id }),
-      colorScheme: 'default',
+      ...newGameSnapshot(),
+
+      getTimer: () => elapsedSeconds(get()),
+
+      setCardBack: (id) => set({ cardBack: Math.min(Math.max(id, 1), CARD_BACK_COUNT) }),
       setColorScheme: (scheme) => set({ colorScheme: scheme }),
-      setShowWinModal: (show) => set({ showWinModal: show }),
-      lastAnimation: null,
+      recordLoss: () => set({ currentStreak: 0, lastWinSummary: null }),
 
       initializeGame: (seed) => {
-        set({ ...cloneSnapshot(createSnapshot(seed ?? randomSeed())), lastAnimation: null });
+        const next = newGameSnapshot(seed ?? randomSeed());
+        const { gamesPlayed, gamesWon, currentStreak, bestStreak, bestScore, bestTime, leastMoves, lastWinSummary } =
+          get();
+        set({ ...next, gamesPlayed, gamesWon, currentStreak, bestStreak, bestScore, bestTime, leastMoves, lastWinSummary });
       },
 
       moveCards: (fromPileIndex, toPileIndex, cardIndex) => {
-        const { tableau, history, moves, score, foundation, recordedGameStarted, recordedGameWon } = get();
-        const fromPile = tableau[fromPileIndex];
-        const toPile = tableau[toPileIndex];
-        const cardsToMove = fromPile.cards.slice(cardIndex);
+        const before = get();
+        const next = applyMoveEvent(before, { fromPileIndex, toPileIndex, cardIndex });
+        if (!next) return;
 
-        if (!isValidMoveGroup(cardsToMove)) return;
-
-        if (toPile.cards.length > 0) {
-          const targetCard = toPile.cards[toPile.cards.length - 1];
-          const movingCard = cardsToMove[0];
-          if (targetCard.rank !== movingCard.rank + 1) return;
-        }
-
-        const newHistory = [
-          ...history,
-          {
-            tableau: JSON.parse(JSON.stringify(tableau)),
-            stock: JSON.parse(JSON.stringify(get().stock)),
-            foundation: [...foundation],
-            score
-          }
-        ];
-
-        const newTableau = [...tableau];
-
-        newTableau[fromPileIndex] = {
-          ...fromPile,
-          cards: fromPile.cards.slice(0, cardIndex)
-        };
-
-        newTableau[toPileIndex] = {
-          ...toPile,
-          cards: [...toPile.cards, ...cardsToMove]
-        };
-
-        if (newTableau[fromPileIndex].cards.length > 0) {
-          const lastCard =
-            newTableau[fromPileIndex].cards[newTableau[fromPileIndex].cards.length - 1];
-          if (!lastCard.faceUp) {
-            const newCards = [...newTableau[fromPileIndex].cards];
-            newCards[newCards.length - 1] = { ...lastCard, faceUp: true };
-            newTableau[fromPileIndex].cards = newCards;
-          }
-        }
-
-        const newFoundation = [...foundation];
-        let newScore = score - 1;
-        const completedRuns: CompletedRunAnimation[] = [];
-
-        const targetPile = newTableau[toPileIndex];
-        if (checkCompletedRun(targetPile.cards)) {
-          const completedCards = targetPile.cards.slice(targetPile.cards.length - 13);
-          const completedSuit = targetPile.cards[targetPile.cards.length - 1].suit;
-          completedRuns.push(
-            createCompletedRunAnimation(completedCards, toPileIndex, newFoundation.length)
-          );
-
-          newTableau[toPileIndex] = {
-            ...targetPile,
-            cards: targetPile.cards.slice(0, targetPile.cards.length - 13)
-          };
-          newFoundation.push(completedSuit);
-          newScore += 100;
-
-          if (newTableau[toPileIndex].cards.length > 0) {
-            const lastCard =
-              newTableau[toPileIndex].cards[newTableau[toPileIndex].cards.length - 1];
-            if (!lastCard.faceUp) {
-              const newCards = [...newTableau[toPileIndex].cards];
-              newCards[newCards.length - 1] = { ...lastCard, faceUp: true };
-              newTableau[toPileIndex].cards = newCards;
-            }
-          }
-        }
-
-        const gameWon = newFoundation.length === 8;
+        const firstAction = before.moves === 0;
+        const gameWon = next.gameWon;
+        const timerState = gameWon ? freezeTimer(before) : {};
 
         set({
-          tableau: newTableau,
-          history: newHistory,
-          moves: moves + 1,
-          score: newScore,
-          foundation: newFoundation,
-          gameWon,
-          showWinModal: gameWon,
+          ...next,
           isPlaying: true,
           isPaused: false,
-          recordedGameStarted: true,
-          recordedGameWon: gameWon || recordedGameWon,
-          lastAnimation: {
-            id: Date.now() + Math.random(),
-            movedCardIds: cardsToMove.map((card) => card.id),
-            completedRuns
-          }
+          playingSince: gameWon ? null : before.playingSince ?? Date.now(),
+          ...timerState,
+          ...(firstAction ? recordGameStart(before) : {}),
+          ...(gameWon ? recordWin({ ...before, ...timerState }, next.score, elapsedSeconds({ ...before, ...timerState }), next.moves) : {})
         });
-
-        if (!recordedGameStarted) {
-          useStatsStore.getState().recordGameStart();
-        }
-        if (gameWon && !recordedGameWon) {
-          useStatsStore.getState().recordWin(newScore, get().timer, moves + 1);
-        }
-        useStatsStore.getState().recordMove();
       },
 
       dealFromStock: () => {
-        const { stock, tableau, history, foundation, score, recordedGameStarted, recordedGameWon } = get();
-        if (stock.length === 0) return;
+        const before = get();
+        if (before.stock.length === 0) return;
 
-        const newHistory = [
-          ...history,
-          {
-            tableau: JSON.parse(JSON.stringify(tableau)),
-            stock: JSON.parse(JSON.stringify(stock)),
-            foundation: [...foundation],
-            score
-          }
-        ];
+        const next = applyDealEvent(before);
+        if (!next) return;
 
-        const newStock = [...stock];
-        const newTableau = [...tableau];
-        const newFoundation = [...foundation];
-        let newScore = score;
-        const dealtCardIds: string[] = [];
-        const completedRuns: CompletedRunAnimation[] = [];
-
-        for (let i = 0; i < 10; i += 1) {
-          if (newStock.length === 0) break;
-
-          const card = newStock.pop()!;
-          card.faceUp = true;
-          dealtCardIds.push(card.id);
-          newTableau[i] = {
-            ...newTableau[i],
-            cards: [...newTableau[i].cards, card]
-          };
-
-          if (checkCompletedRun(newTableau[i].cards)) {
-            const completedCards = newTableau[i].cards.slice(newTableau[i].cards.length - 13);
-            const completedSuit = newTableau[i].cards[newTableau[i].cards.length - 1].suit;
-            completedRuns.push(
-              createCompletedRunAnimation(completedCards, i, newFoundation.length)
-            );
-
-            newTableau[i].cards = newTableau[i].cards.slice(0, newTableau[i].cards.length - 13);
-            newFoundation.push(completedSuit);
-            newScore += 100;
-
-            if (newTableau[i].cards.length > 0) {
-              const lastCard = newTableau[i].cards[newTableau[i].cards.length - 1];
-              if (!lastCard.faceUp) {
-                const newCards = [...newTableau[i].cards];
-                newCards[newCards.length - 1] = { ...lastCard, faceUp: true };
-                newTableau[i].cards = newCards;
-              }
-            }
-          }
-        }
-
-        const gameWon = newFoundation.length === 8;
+        const firstAction = before.moves === 0;
+        const gameWon = next.gameWon;
+        const timerState = gameWon ? freezeTimer(before) : {};
 
         set({
-          stock: newStock,
-          tableau: newTableau,
-          history: newHistory,
-          foundation: newFoundation,
-          score: newScore,
-          gameWon,
-          showWinModal: gameWon,
+          ...next,
           isPlaying: !gameWon,
           isPaused: false,
-          recordedGameStarted: true,
-          recordedGameWon: gameWon || recordedGameWon,
-          lastAnimation: {
-            id: Date.now() + Math.random(),
-            dealtCardIds,
-            completedRuns
-          }
+          playingSince: gameWon ? null : before.playingSince ?? Date.now(),
+          ...timerState,
+          ...(firstAction ? recordGameStart(before) : {}),
+          ...(gameWon
+            ? recordWin({ ...before, ...timerState }, next.score, elapsedSeconds({ ...before, ...timerState }), before.moves)
+            : {})
         });
-
-        if (!recordedGameStarted) {
-          useStatsStore.getState().recordGameStart();
-        }
-        if (gameWon && !recordedGameWon) {
-          useStatsStore.getState().recordWin(newScore, get().timer, get().moves);
-        }
-        useStatsStore.getState().recordDeal();
       },
 
       undo: () => {
-        const { history, moves } = get();
-        if (history.length === 0) return;
-
-        const previousState = history[history.length - 1];
-        const newHistory = history.slice(0, -1);
+        const next = applyUndoEvent(get());
+        if (!next) return;
 
         set({
-          ...previousState,
-          history: newHistory,
-          moves: moves + 1,
+          ...next,
           isPaused: false,
-          gameWon: false,
-          showWinModal: false,
           isPlaying: true,
-          lastAnimation: null
+          playingSince: get().playingSince ?? Date.now()
         });
-
-        useStatsStore.getState().recordUndo();
       },
-
-      canUndo: () => get().history.length > 0,
-
-      toggleTimer: () =>
-        set((state) => ({ isPlaying: !state.gameWon && !state.isPlaying })),
 
       togglePause: () =>
-        set((state) => ({ isPaused: !state.isPaused })),
-
-      incrementTimer: () =>
-        set((state) => ({
-          timer:
-            state.isPlaying && !state.isPaused && !state.gameWon ? state.timer + 1 : state.timer
-        })),
+        set((state) => {
+          if (state.isPaused) {
+            return { isPaused: false, playingSince: Date.now() };
+          }
+          return { isPaused: true, ...freezeTimer(state) };
+        }),
 
       restartGame: () => {
-        const { seed } = get();
-        get().initializeGame(seed);
-      },
-
-      showHint: () => {
-        const { tableau, stock, moves } = get();
-        useStatsStore.getState().recordHint();
-
-        let bestMove:
-          | { source: { pileIndex: number; cardIndex: number }; target: { pileIndex: number } }
-          | null = null;
-        let bestScore = -1;
-
-        for (let fromPileIndex = 0; fromPileIndex < 10; fromPileIndex += 1) {
-          const fromPile = tableau[fromPileIndex];
-          if (fromPile.cards.length === 0) continue;
-
-          for (let i = 0; i < fromPile.cards.length; i += 1) {
-            const card = fromPile.cards[i];
-            if (!card.faceUp) continue;
-
-            const cardsToMove = fromPile.cards.slice(i);
-            if (!isValidMoveGroup(cardsToMove)) continue;
-
-            const cardAbove = i > 0 ? fromPile.cards[i - 1] : null;
-
-            for (let toPileIndex = 0; toPileIndex < 10; toPileIndex += 1) {
-              if (fromPileIndex === toPileIndex) continue;
-
-              const toPile = tableau[toPileIndex];
-              let score = 0;
-
-              if (toPile.cards.length === 0) {
-                if (i === 0) continue;
-                if (cardAbove && cardAbove.faceUp && cardAbove.suit === card.suit) continue;
-                score = 10;
-              } else {
-                const targetCard = toPile.cards[toPile.cards.length - 1];
-
-                if (targetCard.rank !== card.rank + 1) continue;
-
-                if (cardAbove && cardAbove.faceUp && cardAbove.rank === targetCard.rank) {
-                  const isCurrentSuitMatch = cardAbove.suit === card.suit;
-                  const isTargetSuitMatch = targetCard.suit === card.suit;
-
-                  if (isCurrentSuitMatch) continue;
-                  if (!isTargetSuitMatch) continue;
-
-                  score += 100;
-                }
-
-                score += 20;
-
-                if (targetCard.suit === card.suit) {
-                  score += 40;
-                }
-              }
-
-              if (cardAbove && !cardAbove.faceUp) {
-                score += 60;
-              }
-
-              if (i === 0 && fromPile.cards.length > 0) {
-                score += 15;
-              }
-
-              if (score > bestScore) {
-                bestScore = score;
-                bestMove = {
-                  source: { pileIndex: fromPileIndex, cardIndex: i },
-                  target: { pileIndex: toPileIndex }
-                };
-              }
-            }
-          }
-        }
-
-        let newMoves = moves;
-        let hintDeck = false;
-        let hintNewGame = false;
-        let hintSource: { pileIndex: number; cardIndex: number } | undefined;
-
-        if (bestMove) {
-          hintSource = bestMove.source;
-          newMoves = moves + 1;
-        } else if (stock.length > 0) {
-          hintDeck = true;
-        } else {
-          hintNewGame = true;
-          newMoves = moves + 1;
-        }
-
-        set({
-          hintSource,
-          hintDeck,
-          hintNewGame,
-          moves: newMoves
-        });
-
-        setTimeout(() => {
-          set({ hintSource: undefined, hintDeck: false, hintNewGame: false });
-        }, 2000);
+        get().initializeGame(get().seed);
       },
 
       autoMoveCard: (fromPileIndex, cardIndex) => {
         const { tableau } = get();
-        const fromPile = tableau[fromPileIndex];
-        if (!fromPile || cardIndex >= fromPile.cards.length) return false;
+        const targetIndex = pickAutoMoveTarget(tableau, fromPileIndex, cardIndex);
+        if (targetIndex === -1) return false;
 
-        const cardsToMove = fromPile.cards.slice(cardIndex);
-        if (!isValidMoveGroup(cardsToMove)) return false;
-
-        const movingCard = cardsToMove[0];
-        let bestTargetIndex = -1;
-        let bestScore = -1;
-
-        for (let i = 0; i < 10; i += 1) {
-          if (i === fromPileIndex) continue;
-
-          const pile = tableau[i];
-          let score = -1;
-
-          if (pile.cards.length === 0) {
-            score = 0;
-          } else {
-            const targetCard = pile.cards[pile.cards.length - 1];
-
-            if (targetCard.rank === movingCard.rank + 1) {
-              let runLength = 0;
-              for (let j = pile.cards.length - 1; j >= 0; j -= 1) {
-                const current = pile.cards[j];
-                if (j === pile.cards.length - 1) {
-                  runLength = 1;
-                  continue;
-                }
-                const next = pile.cards[j + 1];
-                if (current.suit === next.suit && current.rank === next.rank + 1) {
-                  runLength += 1;
-                } else {
-                  break;
-                }
-              }
-
-              score = 1000 + runLength;
-            }
-          }
-
-          if (score > bestScore) {
-            bestScore = score;
-            bestTargetIndex = i;
-          }
-        }
-
-        if (bestTargetIndex === -1) return false;
-
-        get().moveCards(fromPileIndex, bestTargetIndex, cardIndex);
+        get().moveCards(fromPileIndex, targetIndex, cardIndex);
         return true;
       }
     }),
     {
       name: 'spider-solitaire-storage',
       version: STORAGE_VERSION,
-      migrate: (persistedState) => {
-        const raw = (persistedState ?? {}) as Record<string, unknown>;
-
-        return {
-          ...createHydratedSnapshot(raw),
-          cardBack: typeof raw.cardBack === 'number' ? raw.cardBack : 1,
-          colorScheme: typeof raw.colorScheme === 'string' ? raw.colorScheme : 'default'
-        };
-      },
-      merge: (persistedState, currentState) => {
-        const raw = (persistedState ?? {}) as Record<string, unknown>;
-
-        return {
-          ...currentState,
-          ...createHydratedSnapshot(raw),
-          cardBack: typeof raw.cardBack === 'number' ? raw.cardBack : currentState.cardBack,
-          colorScheme:
-            typeof raw.colorScheme === 'string' ? raw.colorScheme : currentState.colorScheme
-        };
-      },
+      merge: (persistedState, currentState) => ({
+        ...currentState,
+        ...loadSavedState((persistedState ?? {}) as Record<string, unknown>)
+      }),
       partialize: (state) => ({
         tableau: state.tableau,
         stock: state.stock,
         foundation: state.foundation,
         moves: state.moves,
         score: state.score,
-        timer: state.timer,
+        timer: elapsedSeconds(state),
         isPlaying: state.isPlaying,
         isPaused: state.isPaused,
         gameWon: state.gameWon,
-        showWinModal: state.showWinModal,
         seed: state.seed,
         history: state.history,
-        hintSource: state.hintSource,
-        hintDeck: state.hintDeck,
-        hintNewGame: state.hintNewGame,
-        playMode: state.playMode,
-        recordedGameStarted: state.recordedGameStarted,
-        recordedGameWon: state.recordedGameWon,
         cardBack: state.cardBack,
-        colorScheme: state.colorScheme
+        colorScheme: state.colorScheme,
+        gamesPlayed: state.gamesPlayed,
+        gamesWon: state.gamesWon,
+        currentStreak: state.currentStreak,
+        bestStreak: state.bestStreak,
+        bestScore: state.bestScore,
+        bestTime: state.bestTime,
+        leastMoves: state.leastMoves,
+        lastWinSummary: state.lastWinSummary
       })
     }
   )

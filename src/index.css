@@ -1,135 +1,34 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import './themes.css';
+@import './cards.css';
+@import './app.css';
 
-@layer base {
-  :root {
-    --background: 145 63% 25%; /* Vegas Green */
-    --foreground: 48 96% 89%; /* Light Gold */
-
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
-    --popover: 145 63% 20%;
-    --popover-foreground: 48 96% 89%;
-
-    --primary: 48 96% 53%; /* Gold */
-    --primary-foreground: 145 63% 15%; /* Dark Green Text */
-
-    --secondary: 199 89% 48%; /* Blue */
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 145 63% 20%;
-    --muted-foreground: 145 30% 60%;
-
-    --accent: 32 95% 44%; /* Orange */
-    --accent-foreground: 222.2 47.4% 11.2%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 48 96% 53%; /* Gold borders */
-    --input: 145 63% 20%;
-    --ring: 48 96% 53%;
-
-    --radius: 0.5rem;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-  }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  border-color: hsl(var(--border));
 }
 
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-    background-image: radial-gradient(circle at center, hsl(var(--background)), hsl(var(--popover)));
-    min-height: 100vh;
-  }
+:root {
+  --card-width: 6rem;
+  --card-height: 9rem;
+  --shadow-neo: 4px 4px 0 0 rgba(0, 0, 0, 0.4);
+  --shadow-neo-sm: 2px 2px 0 0 rgba(0, 0, 0, 1);
+  --shadow-neo-lg: 8px 8px 0 0 rgba(0, 0, 0, 0.35);
+  --ease-card: cubic-bezier(0.22, 1, 0.36, 1);
+  --radius: 0.5rem;
 }
 
-/* Custom NeoBrutalism utilities - Vegas Style */
-.neo-box {
-  @apply border-2 border-primary bg-popover text-primary shadow-[4px_4px_0px_0px_rgba(0,0,0,0.4)];
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: hsl(var(--foreground));
+  background-color: hsl(var(--background));
+  background-image: radial-gradient(circle at center, hsl(var(--background)), hsl(var(--popover)));
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-.neo-card {
-  @apply bg-white border-2 border-black shadow-[2px_2px_4px_rgba(0,0,0,0.3)];
-}
-
-.neo-button {
-  @apply px-4 py-2 bg-primary text-primary-foreground font-black uppercase tracking-wider border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,0.4)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,0.4)] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none transition-all;
-}
-
-.card-ghost-move,
-.card-ghost-complete {
-  will-change: transform, opacity;
-  animation-fill-mode: forwards;
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.card-ghost-move {
-  animation-name: card-ghost-move;
-}
-
-.card-ghost-complete {
-  animation-name: card-ghost-complete;
-}
-
-@keyframes card-ghost-move {
-  from {
-    transform: translate3d(0px, 0px, 0px) scale(1);
-    opacity: 1;
-  }
-
-  to {
-    transform: translate3d(var(--ghost-end-x), var(--ghost-end-y), 0px) scale(1);
-    opacity: 1;
-  }
-}
-
-@keyframes card-ghost-complete {
-  0% {
-    transform: translate3d(0px, 0px, 0px) scale(1);
-    opacity: 1;
-  }
-
-  58% {
-    transform: translate3d(var(--ghost-mid-x), var(--ghost-mid-y), 0px) scale(1);
-    opacity: 1;
-  }
-
-  100% {
-    transform: translate3d(var(--ghost-end-x), var(--ghost-end-y), 0px) scale(0.72);
-    opacity: 0.92;
-  }
+button {
+  font: inherit;
+  cursor: pointer;
 }
