@@ -94,17 +94,58 @@ const freezeTimer = (state: GameSnapshot): Pick<GameSnapshot, 'timer' | 'playing
   };
 };
 
+type PreservedProgress = Pick<
+  GameSnapshot,
+  | 'cardBack'
+  | 'colorScheme'
+  | 'gamesPlayed'
+  | 'gamesWon'
+  | 'currentStreak'
+  | 'bestStreak'
+  | 'bestScore'
+  | 'bestTime'
+  | 'leastMoves'
+  | 'lastWinSummary'
+>;
+
+const parseProgress = (raw: Record<string, unknown>): PreservedProgress => ({
+  cardBack:
+    typeof raw.cardBack === 'number' ? Math.min(Math.max(raw.cardBack, 1), CARD_BACK_COUNT) : 1,
+  colorScheme: typeof raw.colorScheme === 'string' ? raw.colorScheme : 'default',
+  gamesPlayed: typeof raw.gamesPlayed === 'number' ? raw.gamesPlayed : 0,
+  gamesWon: typeof raw.gamesWon === 'number' ? raw.gamesWon : 0,
+  currentStreak: typeof raw.currentStreak === 'number' ? raw.currentStreak : 0,
+  bestStreak: typeof raw.bestStreak === 'number' ? raw.bestStreak : 0,
+  bestScore: typeof raw.bestScore === 'number' ? raw.bestScore : 0,
+  bestTime: typeof raw.bestTime === 'number' ? raw.bestTime : null,
+  leastMoves: typeof raw.leastMoves === 'number' ? raw.leastMoves : null,
+  lastWinSummary:
+    raw.lastWinSummary && typeof raw.lastWinSummary === 'object'
+      ? structuredClone(raw.lastWinSummary as LastWinSummary)
+      : null
+});
+
+const preservedProgress = (state: GameSnapshot): PreservedProgress => ({
+  cardBack: state.cardBack,
+  colorScheme: state.colorScheme,
+  gamesPlayed: state.gamesPlayed,
+  gamesWon: state.gamesWon,
+  currentStreak: state.currentStreak,
+  bestStreak: state.bestStreak,
+  bestScore: state.bestScore,
+  bestTime: state.bestTime,
+  leastMoves: state.leastMoves,
+  lastWinSummary: state.lastWinSummary
+});
+
 const loadSavedState = (raw: Record<string, unknown>): GameSnapshot => {
   if (!Array.isArray(raw.tableau) || !Array.isArray(raw.stock) || typeof raw.seed !== 'string') {
     return newGameSnapshot();
   }
 
   if (raw.gameWon) {
-    return newGameSnapshot();
+    return { ...newGameSnapshot(), ...parseProgress(raw) };
   }
-
-  const cardBack =
-    typeof raw.cardBack === 'number' ? Math.min(Math.max(raw.cardBack, 1), CARD_BACK_COUNT) : 1;
 
   const loaded: GameSnapshot = {
     ...newGameSnapshot(raw.seed),
@@ -117,20 +158,8 @@ const loadSavedState = (raw: Record<string, unknown>): GameSnapshot => {
     playingSince: null,
     isPlaying: Boolean(raw.isPlaying),
     isPaused: raw.isPlaying ? true : Boolean(raw.isPaused),
-    cardBack,
-    colorScheme: typeof raw.colorScheme === 'string' ? raw.colorScheme : 'default',
     history: Array.isArray(raw.history) ? structuredClone(raw.history as GameHistory[]) : [],
-    gamesPlayed: typeof raw.gamesPlayed === 'number' ? raw.gamesPlayed : 0,
-    gamesWon: typeof raw.gamesWon === 'number' ? raw.gamesWon : 0,
-    currentStreak: typeof raw.currentStreak === 'number' ? raw.currentStreak : 0,
-    bestStreak: typeof raw.bestStreak === 'number' ? raw.bestStreak : 0,
-    bestScore: typeof raw.bestScore === 'number' ? raw.bestScore : 0,
-    bestTime: typeof raw.bestTime === 'number' ? raw.bestTime : null,
-    leastMoves: typeof raw.leastMoves === 'number' ? raw.leastMoves : null,
-    lastWinSummary:
-      raw.lastWinSummary && typeof raw.lastWinSummary === 'object'
-        ? structuredClone(raw.lastWinSummary as LastWinSummary)
-        : null
+    ...parseProgress(raw)
   };
 
   if (loaded.isPlaying && !loaded.isPaused) {
@@ -176,10 +205,7 @@ export const useGameStore = create<GameStore>()(
       recordLoss: () => set({ currentStreak: 0, lastWinSummary: null }),
 
       initializeGame: (seed) => {
-        const next = newGameSnapshot(seed ?? randomSeed());
-        const { gamesPlayed, gamesWon, currentStreak, bestStreak, bestScore, bestTime, leastMoves, lastWinSummary } =
-          get();
-        set({ ...next, gamesPlayed, gamesWon, currentStreak, bestStreak, bestScore, bestTime, leastMoves, lastWinSummary });
+        set({ ...newGameSnapshot(seed ?? randomSeed()), ...preservedProgress(get()) });
       },
 
       moveCards: (fromPileIndex, toPileIndex, cardIndex) => {
@@ -262,6 +288,7 @@ export const useGameStore = create<GameStore>()(
     {
       name: 'spider-solitaire-storage',
       version: STORAGE_VERSION,
+      migrate: (persistedState) => (persistedState ?? {}) as Record<string, unknown>,
       merge: (persistedState, currentState) => ({
         ...currentState,
         ...loadSavedState((persistedState ?? {}) as Record<string, unknown>)
