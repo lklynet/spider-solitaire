@@ -4,6 +4,8 @@
 
 A modern, open-source Spider Solitaire app focused on local practice play.
 
+<img src="src/assets/screenshot.webp" width="800" alt="Spider Solitaire gameplay screenshot" />
+
 ## Features
 
 - **Classic Gameplay**: Authentic Spider Solitaire rules and mechanics.

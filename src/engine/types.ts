@@ -10,7 +10,6 @@ export interface GameHistory {
   tableau: Card[][];
   stock: Card[];
   foundation: number;
-  score: number;
 }
 
 export interface BoardState {

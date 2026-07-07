@@ -247,7 +247,7 @@ export const useGameStore = create<GameStore>()(
           ...timerState,
           ...(firstAction ? recordGameStart(before) : {}),
           ...(gameWon
-            ? recordWin({ ...before, ...timerState }, next.score, elapsedSeconds({ ...before, ...timerState }), before.moves)
+            ? recordWin({ ...before, ...timerState }, next.score, elapsedSeconds({ ...before, ...timerState }), next.moves)
             : {})
         });
       },

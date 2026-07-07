@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createBoardState } from './deck';
 import { enumerateMoves } from './moves';
-import { applyMoveEvent, applyUndoEvent } from './replay';
+import { applyMoveEvent, applyUndoEvent, applyDealEvent } from './replay';
 import { pickHintMove } from './moves';
 import type { Card, Rank } from './types';
 
@@ -68,4 +68,30 @@ test('pickHintMove returns null on an empty starting board edge case', () => {
   const move = pickHintMove(state.tableau);
 
   assert.equal(move === null || typeof move.fromPileIndex === 'number', true);
+});
+
+test('applyMoveEvent subtracts one point per move', () => {
+  const state = createBoardState('qa-legal-move-seed');
+  const move = findFirstLegalTopMove('qa-legal-move-seed');
+  const next = applyMoveEvent(state, move);
+
+  assert.equal(next?.score, 499);
+});
+
+test('applyUndoEvent subtracts one point without restoring prior score', () => {
+  const state = createBoardState('qa-legal-move-seed');
+  const move = findFirstLegalTopMove('qa-legal-move-seed');
+  const afterMove = applyMoveEvent(state, move);
+  const afterUndo = applyUndoEvent(afterMove!);
+
+  assert.equal(afterUndo?.score, 498);
+  assert.equal(afterUndo?.moves, 2);
+});
+
+test('applyDealEvent subtracts one point and counts as a move', () => {
+  const state = createBoardState('deal-test');
+  const next = applyDealEvent(state);
+
+  assert.equal(next?.score, 499);
+  assert.equal(next?.moves, 1);
 });

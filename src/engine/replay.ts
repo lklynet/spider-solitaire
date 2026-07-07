@@ -13,8 +13,7 @@ function checkCompletedRun(pile: Card[]): boolean {
 const cloneStateForHistory = (state: BoardState): GameHistory => ({
   tableau: structuredClone(state.tableau),
   stock: structuredClone(state.stock),
-  foundation: state.foundation,
-  score: state.score
+  foundation: state.foundation
 });
 
 const applyCompletedRun = (tableau: Card[][], pileIndex: number, foundation: number, score: number) => {
@@ -92,7 +91,9 @@ export const applyDealEvent = (state: BoardState): BoardState | null => {
     ...state,
     tableau: structuredClone(state.tableau),
     stock: structuredClone(state.stock),
-    history: [...state.history, cloneStateForHistory(state)]
+    history: [...state.history, cloneStateForHistory(state)],
+    score: state.score - 1,
+    moves: state.moves + 1
   };
 
   for (let pileIndex = 0; pileIndex < 10; pileIndex += 1) {
@@ -124,7 +125,7 @@ export const applyUndoEvent = (state: BoardState): BoardState | null => {
     tableau: structuredClone(previous.tableau),
     stock: structuredClone(previous.stock),
     foundation: previous.foundation,
-    score: previous.score,
+    score: state.score - 1,
     history: state.history.slice(0, -1),
     moves: state.moves + 1,
     gameWon: false
