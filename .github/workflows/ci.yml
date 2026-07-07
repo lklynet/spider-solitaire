@@ -25,5 +25,5 @@ jobs:
       - name: Build application
         run: npm run build
 
-      - name: Build Docker images
-        run: docker compose build web
+      - name: Build Docker image
+        run: docker build .

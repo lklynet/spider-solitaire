@@ -62,7 +62,8 @@ npm run preview
 Run the local-only app as a single containerized web service:
 
 ```bash
-docker compose up --build
+docker compose pull
+docker compose up
 ```
 
 Then open `http://localhost:8080`.
