@@ -6,6 +6,7 @@ function checkCompletedRun(pile: Card[]): boolean {
 
   const lastThirteen = pile.slice(-13);
   if (lastThirteen[0].rank !== 13) return false;
+  if (lastThirteen.some((card) => !card.faceUp)) return false;
 
   return isValidMoveGroup(lastThirteen);
 }

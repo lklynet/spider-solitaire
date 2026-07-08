@@ -95,3 +95,30 @@ test('applyDealEvent subtracts one point and counts as a move', () => {
   assert.equal(next?.score, 499);
   assert.equal(next?.moves, 1);
 });
+
+test('applyMoveEvent does not complete a run with a face-down card in the sequence', () => {
+  const tableau = [
+  ...Array.from({ length: 9 }, () => [] as Card[]),
+  [
+    card(13, false),
+    card(12, true),
+    card(11, true),
+    card(10, true),
+    card(9, true),
+    card(8, true),
+    card(7, true),
+    card(6, true),
+    card(5, true),
+    card(4, true),
+    card(3, true),
+    card(2, true)
+  ],
+  [card(1, true)]
+  ];
+  const state = { ...createBoardState('hidden-king-run'), tableau, foundation: 0, score: 500, moves: 0, history: [] };
+  const next = applyMoveEvent(state, { fromPileIndex: 10, toPileIndex: 9, cardIndex: 0 });
+
+  assert.notEqual(next, null);
+  assert.equal(next?.foundation, 0);
+  assert.equal(next?.tableau[9].length, 13);
+});
