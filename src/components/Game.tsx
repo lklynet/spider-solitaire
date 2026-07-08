@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { pickHintMove } from '@/engine/moves';
 import { useGameStore } from '../store/gameStore';
 import { COLOR_THEMES } from './SettingsModal';
@@ -32,6 +32,11 @@ export function Game() {
     cardIndex: number;
     timeStamp: number;
   } | null>(null);
+  const hintPenaltyUsedRef = useRef(false);
+
+  useLayoutEffect(() => {
+    hintPenaltyUsedRef.current = false;
+  }, [store.tableau, store.stock, store.foundation, store.history.length]);
 
   useEffect(() => {
     document.body.classList.remove(...themeBodyClasses);
@@ -70,22 +75,29 @@ export function Game() {
     setHintNewGame(false);
   };
 
+  const chargeHintPenalty = () => {
+    if (hintPenaltyUsedRef.current) return;
+    const { moves, score } = useGameStore.getState();
+    useGameStore.setState({ moves: moves + 1, score: score - 1 });
+    hintPenaltyUsedRef.current = true;
+  };
+
   const showHint = () => {
-    const { tableau, stock, moves } = useGameStore.getState();
+    const { tableau, stock } = useGameStore.getState();
     const bestMove = pickHintMove(tableau);
 
     if (bestMove) {
       setHintSource({ pileIndex: bestMove.fromPileIndex, cardIndex: bestMove.cardIndex });
       setHintDeck(false);
       setHintNewGame(false);
-      useGameStore.setState({ moves: moves + 1 });
+      chargeHintPenalty();
     } else if (stock.length > 0) {
       clearHints();
       setHintDeck(true);
     } else {
       clearHints();
       setHintNewGame(true);
-      useGameStore.setState({ moves: moves + 1 });
+      chargeHintPenalty();
     }
 
     window.setTimeout(clearHints, 2000);
