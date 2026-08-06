@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { enumerateMoves, pickHintMove } from '@/engine/moves';
+import { pickHintMove } from '@/engine/moves';
 import { useGameStore } from '../store/gameStore';
 import { COLOR_THEMES } from './SettingsModal';
 import { Controls } from './Controls';
@@ -63,7 +63,7 @@ export function Game() {
       !gameWon &&
         !isPaused &&
         store.stock.length > 0 &&
-        enumerateMoves(store.tableau).length === 0
+        pickHintMove(store.tableau) === null
     );
   }, [gameWon, hintDeck, isPaused, store.stock, store.tableau]);
 
