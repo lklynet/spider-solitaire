@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { pickHintMove } from '@/engine/moves';
+import { enumerateMoves, pickHintMove } from '@/engine/moves';
 import { useGameStore } from '../store/gameStore';
 import { COLOR_THEMES } from './SettingsModal';
 import { Controls } from './Controls';
@@ -57,6 +57,17 @@ export function Game() {
       setShowWinBanner(true);
     }
   }, [gameWon]);
+
+  useEffect(() => {
+    if (gameWon || isPaused || store.stock.length === 0 || enumerateMoves(store.tableau).length > 0) {
+      setHintDeck(false);
+      return;
+    }
+
+    setHintDeck(true);
+    const timeout = window.setTimeout(() => setHintDeck(false), 2000);
+    return () => window.clearTimeout(timeout);
+  }, [gameWon, isPaused, store.stock, store.tableau]);
 
   useEffect(() => {
     if (!isPlaying || isPaused || gameWon) return;
