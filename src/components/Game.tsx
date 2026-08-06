@@ -59,15 +59,13 @@ export function Game() {
   }, [gameWon]);
 
   useEffect(() => {
-    if (gameWon || isPaused || store.stock.length === 0 || enumerateMoves(store.tableau).length > 0) {
-      setHintDeck(false);
-      return;
-    }
-
-    setHintDeck(true);
-    const timeout = window.setTimeout(() => setHintDeck(false), 2000);
-    return () => window.clearTimeout(timeout);
-  }, [gameWon, isPaused, store.stock, store.tableau]);
+    setHintDeck(
+      !gameWon &&
+        !isPaused &&
+        store.stock.length > 0 &&
+        enumerateMoves(store.tableau).length === 0
+    );
+  }, [gameWon, hintDeck, isPaused, store.stock, store.tableau]);
 
   useEffect(() => {
     if (!isPlaying || isPaused || gameWon) return;
